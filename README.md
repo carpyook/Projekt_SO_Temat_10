@@ -3,7 +3,7 @@
 **Imię i Nazwisko:** Mateusz Karpiuk
 **Nr Albumu:** 155185
 
-**Link do GitHub:**https://github.com/carpyook/Projekt_SO_Temat_10
+**Link do GitHub:** https://github.com/carpyook/Projekt_SO_Temat_10
 
 ## Opis zadania
 
