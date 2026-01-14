@@ -33,11 +33,21 @@ int main(int argc, char *argv[]) {
         pkg.worker_id = getpid();
 
         // mnieszja paczka = mniejsza waga
-        if (type == 'A')        pkg.weight = 1 + rand() % 8;  // 1-8 kg
-        else if (type == 'B')   pkg.weight = 8 + rand() % 8;  // 8-16 kg
-        else                    pkg.weight = 16 + rand() % 9; // 16-25 kg
+        if (type == 'A') {
+            pkg.volume = 64 * 38 * 8;
+            pkg.weight = 0.1 + (rand() % 79) / 10.0;
+        }
+        else if (type == 'B'){
+            pkg.volume = 64 * 38 * 19;
+            pkg.weight = 8.1 + (rand() % 79) / 10.0;
+        }
+        else {
+            pkg.volume = 64 * 38 * 41;
+            pkg.weight = 16.1 + (rand() % 89) / 10.0;
+        }
 
-        printf("[P%c] Mam paczke %d kg. Czekam na tasme...\n", type, pkg.weight);
+        printf("[P%c] Mam paczke %.1f kg, %d cm3. Czekam na tasme...\n", type, pkg.weight, pkg.volume);
+
         
 
         // czekaj na wolne miejsce(tasma pelna = stop)
@@ -48,7 +58,7 @@ int main(int argc, char *argv[]) {
     
         // sprawdzenie udzwigu tasmy (limit M)
         if (belt->current_weight + pkg.weight > MAX_WEIGHT_BELT) {
-            printf("[P%c] BLAD: Tasma przeciazona! (%d + %d > %d). Czekam...\n", 
+            printf("[P%c] BLAD: Tasma przeciazona! (%.1ff + %.1f >  %.1f). Czekam...\n", 
                  type, belt->current_weight, pkg.weight, MAX_WEIGHT_BELT);
                 
             
@@ -70,7 +80,7 @@ int main(int argc, char *argv[]) {
         belt->current_count++;
         belt->current_weight += pkg.weight;
 
-        printf("[P%c] Polozono paczke (Waga: %d). Stan tasmy: %d/%d szt, %d kg\n",
+        printf("[P%c] Polozono paczke (Waga: %.1f). Stan tasmy: %d/%d szt, %.1f kg\n",
             type, pkg.weight, belt->current_count, MAX_BUFFER_SIZE, belt->current_weight);
 
 

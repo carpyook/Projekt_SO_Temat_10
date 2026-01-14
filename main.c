@@ -17,7 +17,7 @@ printf("[info] Magazyn utworzony ID pamieci: %d\n", shm_id);
 belt->head = 0;
 belt->tail = 0;
 belt->current_count = 0;
-belt->current_weight = 0;
+belt->current_weight = 0.0;
 
 //zestaw 3 semaforow
 int sem_id = semget(SEM_KEY, 3, IPC_CREAT | 0666);
@@ -42,7 +42,7 @@ printf("[info] Semafory ustawione: MUTEX=1, EMPTY=%d, FULL=0\n", MAX_BUFFER_SIZE
 
 //SYMULACJA
 printf("[info] tasma jest pusta\n");
-sleep (5);
+sleep (40);
 
 //usuwamy semafory
 check_error(semctl(sem_id, 0, IPC_RMID), "blad usuwania semaforow");

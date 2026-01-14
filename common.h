@@ -14,11 +14,11 @@
 #define SEM_KEY 321
 
 #define MAX_BUFFER_SIZE 10 // K
-#define MAX_WEIGHT_BELT 200 //M
+#define MAX_WEIGHT_BELT 200.0 //M
 
 typedef struct {
     char type;
-    int weight;
+    float weight;
     int volume;
     pid_t worker_id;
 } Package;
@@ -28,7 +28,7 @@ typedef struct {
     int head;
     int tail;
     int current_count;
-    int current_weight;
+    float current_weight;
 } SharedBelt;
 
 static void check_error(int ret, const char *msg) {
