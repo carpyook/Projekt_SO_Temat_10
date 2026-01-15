@@ -34,19 +34,19 @@ int main(int argc, char *argv[]) {
 
         // mnieszja paczka = mniejsza waga
         if (type == 'A') {
-            pkg.volume = 64 * 38 * 8;
+            pkg.volume = (64 * 38 * 8) / 1000000.0;
             pkg.weight = 0.1 + (rand() % 79) / 10.0;
         }
         else if (type == 'B'){
-            pkg.volume = 64 * 38 * 19;
+            pkg.volume = (64 * 38 * 19) / 1000000.0;
             pkg.weight = 8.1 + (rand() % 79) / 10.0;
         }
         else {
-            pkg.volume = 64 * 38 * 41;
+            pkg.volume = (64 * 38 * 41) / 1000000.0;
             pkg.weight = 16.1 + (rand() % 89) / 10.0;
         }
 
-        printf("[P%c] Mam paczke %.1f kg, %d cm3. Czekam na tasme...\n", type, pkg.weight, pkg.volume);
+        printf("[P%c] Mam paczke %.1f kg, %.6f m3. Czekam na tasme...\n", type, pkg.weight, pkg.volume);
 
         
 

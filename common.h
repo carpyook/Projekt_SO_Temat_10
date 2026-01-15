@@ -19,7 +19,7 @@
 typedef struct {
     char type;
     float weight;
-    int volume;
+    float volume;
     pid_t worker_id;
 } Package;
 

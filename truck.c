@@ -3,7 +3,7 @@
 
 // limity ciezarowki
 #define TRUCK_CAPACITY_KG 500.0      // 500 kg
-#define TRUCK_CAPACITY_CM3 5000000   // 5 m^3 = 5,000,000 cm^3
+#define TRUCK_CAPACITY_M3 30        // 30m^3
 #define RETURN_TIME 10               // czas dostawy s
 
 int main() {
@@ -22,7 +22,7 @@ int main() {
     // petla pracy ciezarowki
     while (1) {
         float current_weight = 0.0;   // kg
-        int current_volume = 0;       // cm^3
+        float current_volume = 0.0;       // m^3
         int package_count = 0;
         
         printf("[TRUCK] Rozpoczynam zaladunek...\n");
@@ -41,9 +41,9 @@ int main() {
             
             // sprawdzenie czy sie zmiesci
             if (current_weight + pkg.weight > TRUCK_CAPACITY_KG ||
-                current_volume + pkg.volume > TRUCK_CAPACITY_CM3) {
+                current_volume + pkg.volume > TRUCK_CAPACITY_M3) {
                 
-                printf("[TRUCK] Paczka %c (%.1f kg, %d cm3) sie NIE zmiesci. "
+                printf("[TRUCK] Paczka %c (%.1f kg, %.6f m3) sie NIE zmiesci. "
                        "Koncze zaladunek.\n", 
                        pkg.type, pkg.weight, pkg.volume);
                 
@@ -62,8 +62,8 @@ int main() {
             current_volume += pkg.volume;
             package_count++;
             
-            printf("[TRUCK] Zaladowano paczke %c (%.1f kg, %d cm3). "
-                   "Stan ciezarowki: %d paczek, %.1f kg, %d cm3\n",
+            printf("[TRUCK] Zaladowano paczke %c (%.1f kg, %.6f m3). "
+                   "Stan ciezarowki: %d paczek, %.1f kg, %.6f m3\n",
                    pkg.type, pkg.weight, pkg.volume,
                    package_count, current_weight, current_volume);
             
@@ -75,7 +75,7 @@ int main() {
         }
         
         // jazda ciezarowki
-        printf("[TRUCK] Pelna! Jade dostarczyc %d paczek (%.1f kg, %d cm3). "
+        printf("[TRUCK] Pelna! Jade dostarczyc %d paczek (%.1f kg, %.6f m3). "
                "Wracam za %d sekund!\n",
                package_count, current_weight, current_volume, RETURN_TIME);
         
