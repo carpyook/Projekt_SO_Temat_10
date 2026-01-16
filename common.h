@@ -49,7 +49,8 @@ union semun {
 enum SemType {
     SEM_MUTEX = 0, // Dostep do pamieci (binarny 0/1)
     SEM_EMPTY = 1, // Liczba wolnych miejsc
-    SEM_FULL  = 2  // Liczba zajetych miejsc (paczek)
+    SEM_FULL  = 2,  // Liczba zajetych miejsc (paczek)
+    SEM_RAMP  = 3 // Kolejka do rampy
 };
 
 //funkcja P

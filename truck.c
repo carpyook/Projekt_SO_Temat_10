@@ -16,11 +16,17 @@ int main() {
     SharedBelt *belt = (SharedBelt *)shmat(shm_id, NULL, 0);
     if (belt == (void *)-1) check_error(-1, "Truck: blad shmat");
     
-    int sem_id = semget(SEM_KEY, 3, 0);
+    int sem_id = semget(SEM_KEY, 4, 0);
     check_error(sem_id, "Truck: blad semget");
     
     // petla pracy ciezarowki
     while (1) {
+
+         printf("[TRUCK %d] Czekam w kolejce do rampy...\n", getpid());
+         sem_wait(sem_id, SEM_RAMP); // czekaj na wjazd
+         printf("[TRUCK %d] Wjechalem na rampe! Zaczynam zaladunek.\n", getpid());
+
+
         float current_weight = 0.0;   // kg
         float current_volume = 0.0;       // m^3
         int package_count = 0;
@@ -74,6 +80,9 @@ int main() {
             sleep(1); // symulacja czasu zaladunku jednej paczki
         }
         
+        printf("[TRUCK %d] ODJEZDZAM! Zwalniam rampe.\n", getpid());
+        sem_signal(sem_id, SEM_RAMP); // Zwolnij miejsce dla kolejnej ciezarowki
+
         // jazda ciezarowki
         printf("[TRUCK] Pelna! Jade dostarczyc %d paczek (%.1f kg, %.6f m3). "
                "Wracam za %d sekund!\n",

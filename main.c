@@ -1,4 +1,10 @@
+#define _XOPEN_SOURCE 700 // potrzebne dla funkcji kill
 #include "common.h"
+#include <signal.h>
+#include <sys/wait.h>
+
+#define NUM_WORKERS 3 // 3 pracownikow
+#define NUM_TRUCKS 3 // 3 ciezarowki
 
 int main() {
     printf("START \n");
@@ -20,7 +26,7 @@ belt->current_count = 0;
 belt->current_weight = 0.0;
 
 //zestaw 3 semaforow
-int sem_id = semget(SEM_KEY, 3, IPC_CREAT | 0666);
+int sem_id = semget(SEM_KEY, 4, IPC_CREAT | 0666);
 check_error(sem_id, "error semget");
 printf("[info] Semafory utworzone ID: %d\n", sem_id);
 
@@ -38,11 +44,44 @@ check_error(semctl(sem_id, SEM_EMPTY, SETVAL, arg), "blad init EMPTY");
 arg.val = 0;
 check_error(semctl(sem_id, SEM_FULL, SETVAL, arg), "blad init FULL");
 
-printf("[info] Semafory ustawione: MUTEX=1, EMPTY=%d, FULL=0\n", MAX_BUFFER_SIZE);
+// 4. RAMP = 1 (1 = wolna, 0 = zajeta)
+arg.val = 1;
+check_error(semctl(sem_id, SEM_RAMP, SETVAL, arg), "blad init RAMP");
+ 
+//uruchamianie pracownikow
+printf("[MAIN] Uruchamiam pracownikow...\n");
+pid_t workers[NUM_WORKERS];
+char types[] = {'A', 'B', 'C'};
 
-//SYMULACJA
-printf("[info] tasma jest pusta\n");
-sleep (40);
+for (int i = 0; i < NUM_WORKERS; i++) {
+    if ((workers[i] = fork()) == 0) {
+        char type_str[2] = {types[i], '\0'};
+        execl("./worker", "worker", type_str, NULL);
+        exit(1);
+    }
+}
+
+//tworzenie floty ciezarowek
+printf("[MAIN] Uruchamiam flote %d ciezarowek...\n", NUM_TRUCKS);
+pid_t trucks[NUM_TRUCKS];
+for (int i = 0; i < NUM_TRUCKS; i++) {
+    if ((trucks[i] = fork()) == 0) {
+        execl("./truck", "truck", NULL);
+        exit(1);
+    }
+}
+
+// symulacja
+printf("[MAIN] Symulacja trwa 60 sekund\n");
+sleep(60);
+
+// zabijanie procesow
+printf("[MAIN] Koniec! Zabijam procesy\n");
+for (int i = 0; i < NUM_WORKERS; i++) kill(workers[i], SIGTERM);
+for (int i = 0; i < NUM_TRUCKS; i++) kill(trucks[i], SIGTERM);
+    
+// czekanie na posprzatanie
+while(wait(NULL) > 0);
 
 //usuwamy semafory
 check_error(semctl(sem_id, 0, IPC_RMID), "blad usuwania semaforow");
