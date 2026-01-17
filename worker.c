@@ -22,7 +22,7 @@ int main(int argc, char *argv[]) {
     if (belt == (void *)-1) check_error(-1, "Worker: blad shmat");
 
     // semafory
-    int sem_id = semget(SEM_KEY, 3, 0);
+    int sem_id = semget(SEM_KEY, 4, 0);
     check_error(sem_id, "Worker: blad semget");
 
     // petla pracy

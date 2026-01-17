@@ -24,8 +24,9 @@ belt->head = 0;
 belt->tail = 0;
 belt->current_count = 0;
 belt->current_weight = 0.0;
+belt->express_ready = 0;
 
-//zestaw 3 semaforow
+//zestaw 4 semaforow
 int sem_id = semget(SEM_KEY, 4, IPC_CREAT | 0666);
 check_error(sem_id, "error semget");
 printf("[info] Semafory utworzone ID: %d\n", sem_id);
@@ -48,6 +49,14 @@ check_error(semctl(sem_id, SEM_FULL, SETVAL, arg), "blad init FULL");
 arg.val = 1;
 check_error(semctl(sem_id, SEM_RAMP, SETVAL, arg), "blad init RAMP");
  
+// pracownik ekspres przed innymi
+printf("[MAIN] Uruchamiam pracownika P4 (Ekspres)...\n");
+    pid_t p4_pid;
+    if ((p4_pid = fork()) == 0) {
+        execl("./worker_p4", "worker_p4", NULL);
+        perror("blad execl worker_p4");
+        exit(1);
+    }
 //uruchamianie pracownikow
 printf("[MAIN] Uruchamiam pracownikow...\n");
 pid_t workers[NUM_WORKERS];
@@ -74,6 +83,7 @@ for (int i = 0; i < NUM_TRUCKS; i++) {
 // dyspozytor
 printf("\n=== MENU DYSPOZYTORA ===\n");
 printf(" [1] Wyslij ciezarowke (Sygnal 1)\n");
+printf(" [2] Zamow ekspres P4 (Sygnal 2)\n");
 printf(" [3] Koniec pracy (Sygnal 3)\n");
     
 int cmd;
@@ -89,13 +99,18 @@ while(1) {
         printf("[MAIN] Koniec pracy!\n");
         break; 
     }
+    else if (cmd == 2) {
+        printf("[MAIN] Zamawiam ekspres (SIGUSR2)!\n");
+        kill(p4_pid, SIGUSR2);
+    }
 }
     
 // zabijanie procesow
 printf("[MAIN] Koniec! Zabijam procesy\n");
 for (int i = 0; i < NUM_WORKERS; i++) kill(workers[i], SIGTERM);
 for (int i = 0; i < NUM_TRUCKS; i++) kill(trucks[i], SIGTERM);
-    
+kill(p4_pid, SIGTERM);
+
 // czekanie na posprzatanie
 while(wait(NULL) > 0);
 

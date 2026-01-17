@@ -29,6 +29,9 @@ typedef struct {
     int tail;
     int current_count;
     float current_weight;
+
+    Package express_pkg; 
+    int express_ready; // 1 = paczka gotowa do odbioru, 0 = brak
 } SharedBelt;
 
 static void check_error(int ret, const char *msg) {

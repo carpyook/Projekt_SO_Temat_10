@@ -54,7 +54,7 @@ int main() {
         
         // petla zaladunku
         while (1) {
-            
+
             // sprawdzenie czy jest sygnal 1
             if (force_departure) {
                 printf("[TRUCK %d] otrzymano sygnal 1: Wymuszony odjazd!\n", getpid());
@@ -74,7 +74,33 @@ int main() {
                 if (force_departure) break;
                 continue;
             }
-                        
+            
+            //sprawdzenie czy jest ekspres
+            if (belt->express_ready == 1) {
+                Package exp = belt->express_pkg;
+
+                //sprawdzenie czy sie zmiesci
+                if (current_weight + exp.weight <= TRUCK_CAPACITY_KG && current_volume + exp.volume <= TRUCK_CAPACITY_M3) {
+
+                    //ladowanie ekspresu
+                    current_weight += exp.weight;
+                    current_volume += exp.volume;
+                    package_count++;
+
+                    printf("[TRUCK %d] !!! EKSPRES !!! Zaladowano (%.1f kg). Stan: %d\n", getpid(), exp.weight, package_count);
+
+                    belt->express_ready = 0; // oznaczamy jako odebrana
+
+                    sem_signal(sem_id, SEM_MUTEX); // oddanie mutexu
+
+                    sleep(1);
+                    continue;
+                } 
+                else {
+                    printf("[TRUCK] Ekspres sie nie zmiesci!\n");
+                }
+            }
+
             // pobierz paczke z head
             Package pkg = belt->buffer[belt->head];
             
