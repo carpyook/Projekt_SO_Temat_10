@@ -77,4 +77,19 @@ static void sem_signal(int sem_id, int sem_num) {
     }
 }
 
+// funkcja zwracajaca -1 jak przerwie ja sygnal, 0 jak sukces
+static inline int sem_wait_wrapper(int sem_id, int sem_num) {
+    struct sembuf op;
+    op.sem_num = sem_num;
+    op.sem_op = -1;
+    op.sem_flg = 0;
+    
+    if (semop(sem_id, &op, 1) == -1) {
+        if (errno == EINTR) return -1; // przerwane przez sygnal
+        perror("Blad sem_wait_wrapper");
+        exit(EXIT_FAILURE);
+    }
+    return 0;
+}
+
 #endif

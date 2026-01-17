@@ -71,10 +71,26 @@ for (int i = 0; i < NUM_TRUCKS; i++) {
     }
 }
 
-// symulacja
-printf("[MAIN] Symulacja trwa 60 sekund\n");
-sleep(60);
+// dyspozytor
+printf("\n=== MENU DYSPOZYTORA ===\n");
+printf(" [1] Wyslij ciezarowke (Sygnal 1)\n");
+printf(" [3] Koniec pracy (Sygnal 3)\n");
+    
+int cmd;
+while(1) {
+    printf("Podaj komende: ");
+    if (scanf("%d", &cmd) != 1) break; 
 
+    if (cmd == 1) {
+        printf("[MAIN] Wysylam nakaz odjazdu (SIGUSR1) do floty!\n");
+        for(int i=0; i<NUM_TRUCKS; i++) kill(trucks[i], SIGUSR1);
+    }
+    else if (cmd == 3) {
+        printf("[MAIN] Koniec pracy!\n");
+        break; 
+    }
+}
+    
 // zabijanie procesow
 printf("[MAIN] Koniec! Zabijam procesy\n");
 for (int i = 0; i < NUM_WORKERS; i++) kill(workers[i], SIGTERM);
