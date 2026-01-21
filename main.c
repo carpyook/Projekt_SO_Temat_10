@@ -51,33 +51,56 @@ check_error(semctl(sem_id, SEM_RAMP, SETVAL, arg), "blad init RAMP");
  
 // pracownik ekspres przed innymi
 printf("[MAIN] Uruchamiam pracownika P4 (Ekspres)...\n");
-    pid_t p4_pid;
-    if ((p4_pid = fork()) == 0) {
-        execl("./worker_p4", "worker_p4", NULL);
-        perror("blad execl worker_p4");
-        exit(1);
-    }
-//uruchamianie pracownikow
+pid_t p4_pid = fork();
+if (p4_pid == -1) {
+    perror("fork p4");
+    semctl(sem_id, 0, IPC_RMID);
+    shmdt(belt);
+    shmctl(shm_id, IPC_RMID, NULL);
+    exit(EXIT_FAILURE);
+}
+if (p4_pid == 0) {
+    execl("./worker_p4", "worker_p4", NULL);
+    perror("blad execl worker_p4");
+    _exit(1);
+}
+
+// uruchamianie pracownikow
 printf("[MAIN] Uruchamiam pracownikow...\n");
 pid_t workers[NUM_WORKERS];
 char types[] = {'A', 'B', 'C'};
-
 for (int i = 0; i < NUM_WORKERS; i++) {
-    if ((workers[i] = fork()) == 0) {
+    workers[i] = fork();
+    if (workers[i] == -1) {
+        perror("fork worker");
+        fprintf(stderr, "[BLAD] Nie mozna utworzyc pracownika %d\n", i + 1);
+        continue;
+    }
+    if (workers[i] == 0) {
         char type_str[2] = {types[i], '\0'};
         execl("./worker", "worker", type_str, NULL);
-        exit(1);
+        perror("execl worker");
+        _exit(1);
     }
+    printf("[MAIN] Uruchomiono pracownika P%d (PID: %d, typ: %c)\n", i + 1, workers[i], types[i]);
 }
 
-//tworzenie floty ciezarowek
+// tworzenie floty ciezarowek
 printf("[MAIN] Uruchamiam flote %d ciezarowek...\n", NUM_TRUCKS);
 pid_t trucks[NUM_TRUCKS];
 for (int i = 0; i < NUM_TRUCKS; i++) {
-    if ((trucks[i] = fork()) == 0) {
-        execl("./truck", "truck", NULL);
-        exit(1);
+    trucks[i] = fork();
+    if (trucks[i] == -1) {
+        perror("fork truck");
+        fprintf(stderr, "[BLAD] Nie mozna utworzyc ciezarowki %d\n", i + 1);
+        continue;
     }
+    if (trucks[i] == 0) {
+        execl("./truck", "truck", NULL);
+        perror("execl truck");
+        _exit(1);
+    }
+    printf("[MAIN] Uruchomiono ciezarowke %d (PID: %d)\n", i + 1, trucks[i]);
 }
 
 // dyspozytor
