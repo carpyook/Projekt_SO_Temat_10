@@ -9,6 +9,7 @@
 #include <sys/shm.h>
 #include <sys/sem.h>
 #include <errno.h>
+#include <sys/resource.h>
 
 #define SHM_KEY 123
 #define SEM_KEY 321
@@ -92,6 +93,26 @@ static inline int sem_wait_wrapper(int sem_id, int sem_num) {
         perror("Blad sem_wait_wrapper");
         exit(EXIT_FAILURE);
     }
+    return 0;
+}
+
+// Sprawdzanie limitu procesow w systemie
+static inline int check_process_limit(int needed) {
+    struct rlimit rl;
+    
+    if (getrlimit(RLIMIT_NPROC, &rl) == -1) {
+        perror("getrlimit RLIMIT_NPROC");
+        return -1;
+    }
+    
+    printf("[INFO] Limit procesow: soft=%ld, hard=%ld, potrzeba=%d\n", 
+           (long)rl.rlim_cur, (long)rl.rlim_max, needed);
+    
+    if (rl.rlim_cur != RLIM_INFINITY && (long)rl.rlim_cur < needed + 10) {
+        fprintf(stderr, "[BLAD] Limit procesow moze byc niewystarczajacy!\n");
+        return -1;
+    }
+    
     return 0;
 }
 

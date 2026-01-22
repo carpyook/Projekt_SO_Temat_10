@@ -7,9 +7,15 @@
 #define NUM_TRUCKS 3 // 3 ciezarowki
 
 int main() {
-    printf("START \n");
-
-    int shm_id = shmget(SHM_KEY, sizeof(SharedBelt), IPC_CREAT | 0666); // 0666 prawa do odczytu i zapisu dla wszystkich
+    printf("START SYMULACJI MAGAZYNU \n");
+    
+    // Sprawdzenie limitu procesow
+    int needed_processes = NUM_WORKERS + NUM_TRUCKS + 2;
+    if (check_process_limit(needed_processes) == -1) {
+        fprintf(stderr, "Problem z limitem procesow - kontynuuje...\n");
+    }
+    
+    int shm_id = shmget(SHM_KEY, sizeof(SharedBelt), IPC_CREAT | 0666);
     check_error(shm_id, "error shmget"); // weryfikacja alokacji
 
 SharedBelt *belt = (SharedBelt *)shmat(shm_id, NULL, 0);
@@ -110,21 +116,45 @@ printf(" [2] Zamow ekspres P4 (Sygnal 2)\n");
 printf(" [3] Koniec pracy (Sygnal 3)\n");
     
 int cmd;
-while(1) {
-    printf("Podaj komende: ");
-    if (scanf("%d", &cmd) != 1) break; 
+char input_buffer[100];
 
+while(1) {
+    printf("\nPodaj komende (1-3): ");
+    fflush(stdout);
+    
+    if (fgets(input_buffer, sizeof(input_buffer), stdin) == NULL) {
+        printf("[INFO] Koniec wejscia \n");
+        break;
+    }
+    
+    char *endptr;
+    long val = strtol(input_buffer, &endptr, 10);
+    
+    if (endptr == input_buffer) {
+        printf("[BLAD] Nieprawidlowe dane! Podaj liczbe 1, 2 lub 3.\n");
+        continue;
+    }
+    
+    if (val < 1 || val > 3) {
+        printf("[BLAD] Komenda musi byc z zakresu 1-3!\n");
+        continue;
+    }
+    
+    cmd = (int)val;
+    
     if (cmd == 1) {
         printf("[MAIN] Wysylam nakaz odjazdu (SIGUSR1) do floty!\n");
-        for(int i=0; i<NUM_TRUCKS; i++) kill(trucks[i], SIGUSR1);
-    }
-    else if (cmd == 3) {
-        printf("[MAIN] Koniec pracy!\n");
-        break; 
+        for(int i = 0; i < NUM_TRUCKS; i++) {
+            if (trucks[i] > 0) kill(trucks[i], SIGUSR1);
+        }
     }
     else if (cmd == 2) {
         printf("[MAIN] Zamawiam ekspres (SIGUSR2)!\n");
-        kill(p4_pid, SIGUSR2);
+        if (p4_pid > 0) kill(p4_pid, SIGUSR2);
+    }
+    else if (cmd == 3) {
+        printf("[MAIN] Koniec pracy!\n");
+        break;
     }
 }
     
