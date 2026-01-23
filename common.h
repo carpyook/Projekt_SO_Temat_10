@@ -33,6 +33,7 @@ typedef struct {
 
     Package express_pkg; 
     int express_ready; // 1 = paczka gotowa do odbioru, 0 = brak
+    volatile int shutdown;
 } SharedBelt;
 
 static void check_error(int ret, const char *msg) {

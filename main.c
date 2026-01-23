@@ -31,6 +31,7 @@ belt->tail = 0;
 belt->current_count = 0;
 belt->current_weight = 0.0;
 belt->express_ready = 0;
+belt->shutdown = 0;
 
 //zestaw 4 semaforow
 int sem_id = semget(SEM_KEY, 4, IPC_CREAT | 0666);
@@ -158,11 +159,31 @@ while(1) {
     }
 }
     
+// graceful shutdown
+printf("[MAIN] Ustawiam flage zakonczenia pracy...\n");
+belt->shutdown = 1;
+
+sleep(1);
+
+// odblokuj procesy czekające na semaforach
+for (int i = 0; i < NUM_TRUCKS; i++) {
+    sem_signal(sem_id, SEM_FULL);
+}
+for (int i = 0; i < MAX_BUFFER_SIZE; i++) {
+    sem_signal(sem_id, SEM_EMPTY);
+}
+
+sleep(1);
+
 // zabijanie procesow
-printf("[MAIN] Koniec! Zabijam procesy\n");
-for (int i = 0; i < NUM_WORKERS; i++) kill(workers[i], SIGTERM);
-for (int i = 0; i < NUM_TRUCKS; i++) kill(trucks[i], SIGTERM);
-kill(p4_pid, SIGTERM);
+printf("[MAIN] Wysylam SIGTERM do procesow...\n");
+for (int i = 0; i < NUM_WORKERS; i++) {
+    if (workers[i] > 0) kill(workers[i], SIGTERM);
+}
+for (int i = 0; i < NUM_TRUCKS; i++) {
+    if (trucks[i] > 0) kill(trucks[i], SIGTERM);
+}
+if (p4_pid > 0) kill(p4_pid, SIGTERM);
 
 // czekanie na posprzatanie
 while(wait(NULL) > 0);
