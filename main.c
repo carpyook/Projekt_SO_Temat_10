@@ -2,9 +2,40 @@
 #include "common.h"
 #include <signal.h>
 #include <sys/wait.h>
+#include <fcntl.h>
+#include <stdarg.h>
 
 #define NUM_WORKERS 3 // 3 pracownikow
 #define NUM_TRUCKS 3 // 3 ciezarowki
+
+void write_report(const char *format, ...) {
+    int fd = open(REPORT_FILE, O_WRONLY | O_CREAT | O_APPEND, 0644);
+    if (fd == -1) {
+        perror("open raport");
+        return;
+    }
+
+    char buffer[512];
+    time_t now = time(NULL);
+    struct tm *tm_info = localtime(&now);
+
+    int len = strftime(buffer, sizeof(buffer), "[%Y-%m-%d %H:%M:%S] ", tm_info);
+
+    va_list args;
+    va_start(args, format);
+    len += vsnprintf(buffer + len, sizeof(buffer) - len, format, args);
+    va_end(args);
+
+    if (len < (int)sizeof(buffer) - 1) {
+        buffer[len++] = '\n';
+    }
+
+    if (write(fd, buffer, len) == -1) {
+        perror("write raport");
+    }
+
+    close(fd);
+}
 
 int main() {
     printf("START SYMULACJI MAGAZYNU \n");
@@ -50,6 +81,21 @@ if (msg_id == -1) {
 
 printf("[info] Kolejka komunikatow utworzona ID: %d\n", msg_id);
 
+// tworzenie raportu
+int report_fd = open(REPORT_FILE, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+if (report_fd == -1) {
+    perror("open raport");
+} else {
+    const char *header = "=== RAPORT SYMULACJI MAGAZYNU ===\n\n";
+    if (write(report_fd, header, strlen(header)) == -1) {
+        perror("write header");
+    }
+    close(report_fd);
+    printf("[info] Plik raportu utworzony: %s\n", REPORT_FILE);
+}
+
+write_report("Symulacja rozpoczeta");
+
 union semun arg;
 
 // 1. MUTEX = 1 (Dostep do tasmy)
@@ -83,6 +129,8 @@ if (p4_pid == 0) {
     perror("blad execl worker_p4");
     _exit(1);
 }
+printf("[MAIN] Uruchomiono pracownika P4 (PID: %d)\n", p4_pid);
+write_report("Uruchomiono pracownika P4 (Ekspres, PID: %d)", p4_pid);
 
 // uruchamianie pracownikow
 printf("[MAIN] Uruchamiam pracownikow...\n");
@@ -102,6 +150,7 @@ for (int i = 0; i < NUM_WORKERS; i++) {
         _exit(1);
     }
     printf("[MAIN] Uruchomiono pracownika P%d (PID: %d, typ: %c)\n", i + 1, workers[i], types[i]);
+    write_report("Uruchomiono pracownika P%d (typ %c, PID: %d)", i + 1, types[i], workers[i]);
 }
 
 // tworzenie floty ciezarowek
@@ -120,6 +169,7 @@ for (int i = 0; i < NUM_TRUCKS; i++) {
         _exit(1);
     }
     printf("[MAIN] Uruchomiono ciezarowke %d (PID: %d)\n", i + 1, trucks[i]);
+    write_report("Uruchomiono ciezarowke %d (PID: %d)", i + 1, trucks[i]);
 }
 
 // dyspozytor
@@ -160,13 +210,16 @@ while(1) {
         for(int i = 0; i < NUM_TRUCKS; i++) {
             if (trucks[i] > 0) kill(trucks[i], SIGUSR1);
         }
+        write_report("DYSPOZYTOR: Sygnal 1 - wymuszony odjazd");
     }
     else if (cmd == 2) {
         printf("[MAIN] Zamawiam ekspres (SIGUSR2)!\n");
         if (p4_pid > 0) kill(p4_pid, SIGUSR2);
+        write_report("DYSPOZYTOR: Sygnal 2 - zamowienie ekspresu");
     }
     else if (cmd == 3) {
         printf("[MAIN] Koniec pracy!\n");
+        write_report("DYSPOZYTOR: Sygnal 3 - koniec pracy");
         break;
     }
 }
@@ -196,6 +249,8 @@ for (int i = 0; i < NUM_TRUCKS; i++) {
     if (trucks[i] > 0) kill(trucks[i], SIGTERM);
 }
 if (p4_pid > 0) kill(p4_pid, SIGTERM);
+
+write_report("Symulacja zakonczona");
 
 // czekanie na posprzatanie
 while(wait(NULL) > 0);

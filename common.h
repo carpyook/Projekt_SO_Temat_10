@@ -12,11 +12,12 @@
 #include <sys/msg.h>
 #include <string.h>
 #include <time.h>
+#include <fcntl.h>
 
 #define SHM_KEY 123
 #define SEM_KEY 321
 #define MSG_KEY 456
-
+#define REPORT_FILE "raport_symulacji.txt"
 #define MAX_BUFFER_SIZE 10 // K
 #define MAX_WEIGHT_BELT 200.0 //M
 #define MSG_TYPE_LOG 1
