@@ -15,7 +15,7 @@ int main() {
         fprintf(stderr, "Problem z limitem procesow - kontynuuje...\n");
     }
     
-    int shm_id = shmget(SHM_KEY, sizeof(SharedBelt), IPC_CREAT | 0666);
+    int shm_id = shmget(SHM_KEY, sizeof(SharedBelt), IPC_CREAT | 0600);
     check_error(shm_id, "error shmget"); // weryfikacja alokacji
 
 SharedBelt *belt = (SharedBelt *)shmat(shm_id, NULL, 0);
@@ -34,9 +34,21 @@ belt->express_ready = 0;
 belt->shutdown = 0;
 
 //zestaw 4 semaforow
-int sem_id = semget(SEM_KEY, 4, IPC_CREAT | 0666);
+int sem_id = semget(SEM_KEY, 4, IPC_CREAT | 0600);
 check_error(sem_id, "error semget");
 printf("[info] Semafory utworzone ID: %d\n", sem_id);
+
+// tworzenie kolejki komunikatow
+int msg_id = msgget(MSG_KEY, IPC_CREAT | 0600);
+if (msg_id == -1) {
+    perror("msgget");
+    semctl(sem_id, 0, IPC_RMID);
+    shmdt(belt);
+    shmctl(shm_id, IPC_RMID, NULL);
+    exit(EXIT_FAILURE);
+}
+
+printf("[info] Kolejka komunikatow utworzona ID: %d\n", msg_id);
 
 union semun arg;
 
@@ -187,6 +199,13 @@ if (p4_pid > 0) kill(p4_pid, SIGTERM);
 
 // czekanie na posprzatanie
 while(wait(NULL) > 0);
+
+// usuwanie kolejki komunikatow
+if (msgctl(msg_id, IPC_RMID, NULL) == -1) {
+    perror("msgctl IPC_RMID");
+} else {
+    printf("[info] Kolejka komunikatow usunieta\n");
+}
 
 //usuwamy semafory
 check_error(semctl(sem_id, 0, IPC_RMID), "blad usuwania semaforow");

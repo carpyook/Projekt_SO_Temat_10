@@ -1,3 +1,4 @@
+#define _POSIX_C_SOURCE 200809L // usleep
 #define _XOPEN_SOURCE 700
 #include "common.h"
 #include <time.h>
