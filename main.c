@@ -8,6 +8,35 @@
 #define NUM_WORKERS 3 // 3 pracownikow
 #define NUM_TRUCKS 3 // 3 ciezarowki
 
+static int g_shm_id = -1;
+static int g_sem_id = -1;
+static int g_msg_id = -1;
+static SharedBelt *g_belt = NULL;
+
+void cleanup_ipc(void) {
+    if (g_msg_id != -1) {
+        msgctl(g_msg_id, IPC_RMID, NULL);
+    }
+    if (g_sem_id != -1) {
+        semctl(g_sem_id, 0, IPC_RMID);
+    }
+    if (g_belt != NULL && g_belt != (void*)-1) {
+        shmdt(g_belt);
+    }
+    if (g_shm_id != -1) {
+        shmctl(g_shm_id, IPC_RMID, NULL);
+    }
+}
+
+void handle_sigint(int sig) {
+    (void)sig;
+    printf("\n[MAIN] Otrzymano SIGINT - konczenie pracy...\n");
+    if (g_belt != NULL) {
+        g_belt->shutdown = 1;
+    }
+    exit(0);
+}
+
 void write_report(const char *format, ...) {
     int fd = open(REPORT_FILE, O_WRONLY | O_CREAT | O_APPEND, 0644);
     if (fd == -1) {
@@ -38,6 +67,14 @@ void write_report(const char *format, ...) {
 }
 
 int main() {
+    atexit(cleanup_ipc);
+
+    struct sigaction sa_int;
+    sa_int.sa_handler = handle_sigint;
+    sigemptyset(&sa_int.sa_mask);
+    sa_int.sa_flags = 0;
+    sigaction(SIGINT, &sa_int, NULL);
+
     printf("START SYMULACJI MAGAZYNU \n");
     
     // Sprawdzenie limitu procesow
@@ -47,9 +84,11 @@ int main() {
     }
     
     int shm_id = shmget(SHM_KEY, sizeof(SharedBelt), IPC_CREAT | 0600);
+    g_shm_id = shm_id;
     check_error(shm_id, "error shmget"); // weryfikacja alokacji
 
 SharedBelt *belt = (SharedBelt *)shmat(shm_id, NULL, 0);
+g_belt = belt; // globalny wskaznik do sprzatania
 if (belt == (void *)-1) {
     check_error(-1, "blad shmat");
 }
@@ -63,14 +102,18 @@ belt->current_count = 0;
 belt->current_weight = 0.0;
 belt->express_ready = 0;
 belt->shutdown = 0;
+belt->total_packages = 0;
+belt->total_trucks_sent = 0;
 
-//zestaw 4 semaforow
-int sem_id = semget(SEM_KEY, 4, IPC_CREAT | 0600);
+//zestaw 5 semaforow
+int sem_id = semget(SEM_KEY, NUM_SEMS, IPC_CREAT | 0600);
+g_sem_id = sem_id;
 check_error(sem_id, "error semget");
 printf("[info] Semafory utworzone ID: %d\n", sem_id);
 
 // tworzenie kolejki komunikatow
 int msg_id = msgget(MSG_KEY, IPC_CREAT | 0600);
+g_msg_id = msg_id;
 if (msg_id == -1) {
     perror("msgget");
     semctl(sem_id, 0, IPC_RMID);
@@ -113,7 +156,11 @@ check_error(semctl(sem_id, SEM_FULL, SETVAL, arg), "blad init FULL");
 // 4. RAMP = 1 (1 = wolna, 0 = zajeta)
 arg.val = 1;
 check_error(semctl(sem_id, SEM_RAMP, SETVAL, arg), "blad init RAMP");
- 
+
+// 5. REPORT = 1 (Dostep do pliku raportu)
+arg.val = 1;
+check_error(semctl(sem_id, SEM_REPORT, SETVAL, arg), "blad init REPORT");
+
 // pracownik ekspres przed innymi
 printf("[MAIN] Uruchamiam pracownika P4 (Ekspres)...\n");
 pid_t p4_pid = fork();
@@ -254,6 +301,14 @@ write_report("Symulacja zakonczona");
 
 // czekanie na posprzatanie
 while(wait(NULL) > 0);
+
+printf("\n=== STATYSTYKI ===\n");
+printf("Zaladowano paczek: %d\n", belt->total_packages);
+printf("Wyslano ciezarowek: %d\n", belt->total_trucks_sent);
+printf("==================\n\n");
+
+write_report("Zaladowano paczek: %d", belt->total_packages);
+write_report("Wyslano ciezarowek: %d", belt->total_trucks_sent);
 
 // usuwanie kolejki komunikatow
 if (msgctl(msg_id, IPC_RMID, NULL) == -1) {

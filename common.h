@@ -39,6 +39,8 @@ typedef struct {
     Package express_pkg; 
     int express_ready; // 1 = paczka gotowa do odbioru, 0 = brak
     volatile int shutdown;
+    int total_packages;
+    int total_trucks_sent;
 } SharedBelt;
 
 // struktura wiadomosci dla kolejki komunikatow
@@ -68,9 +70,11 @@ enum SemType {
     SEM_MUTEX = 0, // Dostep do pamieci (binarny 0/1)
     SEM_EMPTY = 1, // Liczba wolnych miejsc
     SEM_FULL  = 2,  // Liczba zajetych miejsc (paczek)
-    SEM_RAMP  = 3 // Kolejka do rampy
+    SEM_RAMP  = 3, // Kolejka do rampy
+    SEM_REPORT = 4 // Dostep do pliku raportu
 };
 
+#define NUM_SEMS 5
 //funkcja P
 static void sem_wait(int sem_id, int sem_num) {
     struct sembuf op;

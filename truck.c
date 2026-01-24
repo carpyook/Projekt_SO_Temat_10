@@ -48,7 +48,7 @@ int main() {
         return 1;
     }
 
-    int sem_id = semget(SEM_KEY, 4, 0);
+    int sem_id = semget(SEM_KEY, NUM_SEMS, 0);
     if (sem_id == -1) {
         perror("Truck: semget");
         shmdt(belt); // clean up
@@ -74,7 +74,7 @@ int main() {
         force_departure = 0;
 
         float current_weight = 0.0;   // kg
-        float current_volume = 0.0;       // m^3
+        float current_volume = 0.0;   // m^3
         int package_count = 0;
         
         // petla zaladunku
@@ -156,6 +156,7 @@ int main() {
             current_weight += pkg.weight;
             current_volume += pkg.volume;
             package_count++;
+            belt->total_packages++;
             
             printf("[TRUCK] Zaladowano paczke %c (%.1f kg, %.6f m3). "
                    "Stan ciezarowki: %d paczek, %.1f kg, %.6f m3\n",
@@ -170,12 +171,13 @@ int main() {
         }
         
         if (package_count > 0) {
-        printf("[TRUCK %d] ODJAZD! %d paczek, %.1f kg\n", getpid(), package_count, current_weight);
-        sem_signal(sem_id, SEM_RAMP);
+            belt->total_trucks_sent++;
+            printf("[TRUCK %d] ODJAZD! %d paczek, %.1f kg\n", getpid(), package_count, current_weight);
+            sem_signal(sem_id, SEM_RAMP);
 
-        sleep(RETURN_TIME);
+            sleep(RETURN_TIME);
 
-        printf("[TRUCK %d] Wrocilem.\n", getpid());
+            printf("[TRUCK %d] Wrocilem.\n", getpid());
 
         } else {
             printf("[TRUCK %d] Brak paczek.\n", getpid());
