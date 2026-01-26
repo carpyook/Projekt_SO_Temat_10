@@ -14,14 +14,40 @@
 #include <time.h>
 #include <fcntl.h>
 
-#define SHM_KEY 123
-#define SEM_KEY 321
-#define MSG_KEY 456
 #define REPORT_FILE "raport_symulacji.txt"
 #define MAX_BUFFER_SIZE 10 // K
 #define MAX_WEIGHT_BELT 200.0 //M
 #define MSG_TYPE_LOG 1
 #define MSG_MAX_TEXT 256
+
+// funkcje generujace klucze IPC przy uzyciu ftok()
+static inline key_t get_shm_key(void) {
+    key_t key = ftok(".", 'S');
+    if (key == -1) {
+        perror("ftok shm");
+        exit(EXIT_FAILURE);
+    }
+    return key;
+}
+
+static inline key_t get_sem_key(void) {
+    key_t key = ftok(".", 'M');
+    if (key == -1) {
+        perror("ftok sem");
+        exit(EXIT_FAILURE);
+    }
+    return key;
+}
+
+static inline key_t get_msg_key(void) {
+    key_t key = ftok(".", 'Q');
+    if (key == -1) {
+        perror("ftok msg");
+        exit(EXIT_FAILURE);
+    }
+    return key;
+}
+
 typedef struct {
     char type;
     float weight;

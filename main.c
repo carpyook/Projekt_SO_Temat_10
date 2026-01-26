@@ -37,6 +37,11 @@ void handle_sigint(int sig) {
     exit(0);
 }
 
+void handle_sigchld(int sig) {
+    (void)sig;
+    while (waitpid(-1, NULL, WNOHANG) > 0);
+}
+
 void write_report(const char *format, ...) {
     int fd = open(REPORT_FILE, O_WRONLY | O_CREAT | O_APPEND, 0644);
     if (fd == -1) {
@@ -75,6 +80,12 @@ int main() {
     sa_int.sa_flags = 0;
     sigaction(SIGINT, &sa_int, NULL);
 
+    struct sigaction sa_chld;
+    sa_chld.sa_handler = handle_sigchld;
+    sigemptyset(&sa_chld.sa_mask);
+    sa_chld.sa_flags = SA_RESTART | SA_NOCLDSTOP;
+    sigaction(SIGCHLD, &sa_chld, NULL);
+
     printf("START SYMULACJI MAGAZYNU \n");
     
     // Sprawdzenie limitu procesow
@@ -83,7 +94,7 @@ int main() {
         fprintf(stderr, "Problem z limitem procesow - kontynuuje...\n");
     }
     
-    int shm_id = shmget(SHM_KEY, sizeof(SharedBelt), IPC_CREAT | 0600);
+    int shm_id = shmget(get_shm_key(), sizeof(SharedBelt), IPC_CREAT | 0600);
     g_shm_id = shm_id;
     check_error(shm_id, "error shmget"); // weryfikacja alokacji
 
@@ -106,13 +117,13 @@ belt->total_packages = 0;
 belt->total_trucks_sent = 0;
 
 //zestaw 5 semaforow
-int sem_id = semget(SEM_KEY, NUM_SEMS, IPC_CREAT | 0600);
+int sem_id = semget(get_sem_key(), NUM_SEMS, IPC_CREAT | 0600);
 g_sem_id = sem_id;
 check_error(sem_id, "error semget");
 printf("[info] Semafory utworzone ID: %d\n", sem_id);
 
 // tworzenie kolejki komunikatow
-int msg_id = msgget(MSG_KEY, IPC_CREAT | 0600);
+int msg_id = msgget(get_msg_key(), IPC_CREAT | 0600);
 g_msg_id = msg_id;
 if (msg_id == -1) {
     perror("msgget");

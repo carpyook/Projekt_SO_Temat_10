@@ -36,7 +36,7 @@ int main(int argc, char *argv[]) {
     // pobranie zasobow
 
     // pamiec
-    int shm_id = shmget(SHM_KEY, sizeof(SharedBelt), 0);
+    int shm_id = shmget(get_shm_key(), sizeof(SharedBelt), 0);
     if (shm_id == -1) {
         perror("Worker: shmget");
         return 1;
@@ -49,7 +49,7 @@ int main(int argc, char *argv[]) {
     }
 
     // semafory
-    int sem_id = semget(SEM_KEY, 4, 0);
+    int sem_id = semget(get_sem_key(), 4, 0);
     if (sem_id == -1) {
         perror("Worker: semget");
         shmdt(belt);  // clean up

@@ -36,7 +36,7 @@ int main() {
     sigaction(SIGTERM, &sa, NULL);
 
     // pobranie zasobow
-    int shm_id = shmget(SHM_KEY, sizeof(SharedBelt), 0);
+    int shm_id = shmget(get_shm_key(), sizeof(SharedBelt), 0);
     if (shm_id == -1) {
         perror("Truck: shmget");
         return 1;
@@ -48,7 +48,7 @@ int main() {
         return 1;
     }
 
-    int sem_id = semget(SEM_KEY, NUM_SEMS, 0);
+    int sem_id = semget(get_sem_key(), NUM_SEMS, 0);
     if (sem_id == -1) {
         perror("Truck: semget");
         shmdt(belt); // clean up
