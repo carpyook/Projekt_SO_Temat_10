@@ -40,7 +40,7 @@ int main() {
         return 1;
     }
 
-    int sem_id = semget(get_sem_key(), 4, 0);
+    int sem_id = semget(get_sem_key(), NUM_SEMS, 0);
     if (sem_id == -1) {
         perror("P4: semget");
         shmdt(belt);  // ← CLEANUP!

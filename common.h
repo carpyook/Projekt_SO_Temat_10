@@ -19,6 +19,7 @@
 #define MAX_WEIGHT_BELT 200.0 //M
 #define MSG_TYPE_LOG 1
 #define MSG_MAX_TEXT 256
+#define MAX_MSG_QUEUE 100 // Maksymalna liczba wiadomosci w kolejce
 
 // funkcje generujace klucze IPC przy uzyciu ftok()
 static inline key_t get_shm_key(void) {
@@ -97,10 +98,11 @@ enum SemType {
     SEM_EMPTY = 1, // Liczba wolnych miejsc
     SEM_FULL  = 2,  // Liczba zajetych miejsc (paczek)
     SEM_RAMP  = 3, // Kolejka do rampy
-    SEM_REPORT = 4 // Dostep do pliku raportu
+    SEM_REPORT = 4, // Dostep do pliku raportu
+    SEM_MSG_GUARD = 5 // Straznik kolejki komunikatow
 };
 
-#define NUM_SEMS 5
+#define NUM_SEMS 6
 //funkcja P
 static void sem_wait(int sem_id, int sem_num) {
     struct sembuf op;

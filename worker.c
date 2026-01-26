@@ -49,7 +49,7 @@ int main(int argc, char *argv[]) {
     }
 
     // semafory
-    int sem_id = semget(get_sem_key(), 4, 0);
+    int sem_id = semget(get_sem_key(), NUM_SEMS, 0);
     if (sem_id == -1) {
         perror("Worker: semget");
         shmdt(belt);  // clean up

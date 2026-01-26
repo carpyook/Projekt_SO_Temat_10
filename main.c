@@ -172,6 +172,10 @@ check_error(semctl(sem_id, SEM_RAMP, SETVAL, arg), "blad init RAMP");
 arg.val = 1;
 check_error(semctl(sem_id, SEM_REPORT, SETVAL, arg), "blad init REPORT");
 
+// 6. MSG_GUARD = MAX_MSG_QUEUE (Straznik kolejki komunikatow)
+arg.val = MAX_MSG_QUEUE;
+check_error(semctl(sem_id, SEM_MSG_GUARD, SETVAL, arg), "blad init MSG_GUARD");
+
 // pracownik ekspres przed innymi
 printf("[MAIN] Uruchamiam pracownika P4 (Ekspres)...\n");
 pid_t p4_pid = fork();
