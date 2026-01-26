@@ -162,8 +162,24 @@ static inline int check_process_limit(int needed) {
     return 0;
 }
 
-// sprawdzemie czy kolejka nie jest pelna
-static inline int send_log_message(int msg_id, const char *text, pid_t sender) {
+// bezpieczne wysylanie wiadomosci do kolejki z semaforem straznikiem
+// zapobiega przepelnieniu kolejki, blokuje jesli pelna
+static inline int send_log_message(int msg_id, int sem_id, const char *text, pid_t sender) {
+    // pobranie klucza od straznika 
+    struct sembuf guard_down;
+    guard_down.sem_num = SEM_MSG_GUARD;
+    guard_down.sem_op = -1;
+    guard_down.sem_flg = IPC_NOWAIT; // nie blokuj jesli pelna, zglos blad
+
+    if (semop(sem_id, &guard_down, 1) == -1) {
+        if (errno == EAGAIN) {
+            fprintf(stderr, "[WARN] Kolejka komunikatow pelna (semafor straznik)!\n");
+            return -1;
+        }
+        perror("semop SEM_MSG_GUARD down");
+        return -1;
+    }
+    // wyslanie wiadomosci
     LogMessage msg;
     msg.mtype = MSG_TYPE_LOG;
     msg.sender_pid = sender;
@@ -173,28 +189,42 @@ static inline int send_log_message(int msg_id, const char *text, pid_t sender) {
 
     size_t msg_size = sizeof(LogMessage) - sizeof(long);
 
-    if (msgsnd(msg_id, &msg, msg_size, IPC_NOWAIT) == -1) {
-        if (errno == EAGAIN) {
-            fprintf(stderr, "[WARN] Kolejka komunikatow pelna! \n");
-            return -1;
-        }
+    if (msgsnd(msg_id, &msg, msg_size, 0) == -1) {  // 0 = blokujace wyslanie
         perror("msgsnd");
+        // oddaj klucz straznika z powrotem
+        struct sembuf guard_up;
+        guard_up.sem_num = SEM_MSG_GUARD;
+        guard_up.sem_op = 1;
+        guard_up.sem_flg = 0;
+        semop(sem_id, &guard_up, 1);
         return -1;
     }
 
     return 0;
 }
 
-static inline int receive_log_message(int msg_id, LogMessage *msg) {
+// odbior wiadomosci z kolejki, zwraca klucz straznikowi
+static inline int receive_log_message(int msg_id, int sem_id, LogMessage *msg) {
     size_t msg_size = sizeof(LogMessage) - sizeof(long);
 
     if (msgrcv(msg_id, msg, msg_size, MSG_TYPE_LOG, IPC_NOWAIT) == -1) {
-        if (errno == ENOMSG) return 0;
+        if (errno == ENOMSG) return 0; // brak wiadomosci
         perror("msgrcv");
         return -1;
     }
 
-    return 1;
+    // odebrano wiadomosc, zwroc klucz straznikowi
+    struct sembuf guard_up;
+    guard_up.sem_num = SEM_MSG_GUARD;
+    guard_up.sem_op = 1;
+    guard_up.sem_flg = 0;
+
+    if (semop(sem_id, &guard_up, 1) == -1) {
+        perror("semop SEM_MSG_GUARD up");
+        return -1;
+    }
+
+    return 1; // sukces
 }
 
 #endif
