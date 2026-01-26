@@ -270,13 +270,21 @@ while(1) {
     if (cmd == 1) {
         printf("[MAIN] Wysylam nakaz odjazdu (SIGUSR1) do floty!\n");
         for(int i = 0; i < NUM_TRUCKS; i++) {
-            if (trucks[i] > 0) kill(trucks[i], SIGUSR1);
+            if (trucks[i] > 0) {
+                if (kill(trucks[i], SIGUSR1) == -1) {
+                    perror("kill SIGUSR1");
+                }
+            }
         }
         write_report("DYSPOZYTOR: Sygnal 1 - wymuszony odjazd");
     }
     else if (cmd == 2) {
         printf("[MAIN] Zamawiam ekspres (SIGUSR2)!\n");
-        if (p4_pid > 0) kill(p4_pid, SIGUSR2);
+        if (p4_pid > 0) {
+            if (kill(p4_pid, SIGUSR2) == -1) {
+                perror("kill SIGUSR2");
+            }
+        }
         write_report("DYSPOZYTOR: Sygnal 2 - zamowienie ekspresu");
     }
     else if (cmd == 3) {
@@ -305,12 +313,24 @@ sleep(1);
 // zabijanie procesow
 printf("[MAIN] Wysylam SIGTERM do procesow...\n");
 for (int i = 0; i < NUM_WORKERS; i++) {
-    if (workers[i] > 0) kill(workers[i], SIGTERM);
+    if (workers[i] > 0) {
+        if (kill(workers[i], SIGTERM) == -1) {
+            perror("kill SIGTERM worker");
+        }
+    }
 }
 for (int i = 0; i < NUM_TRUCKS; i++) {
-    if (trucks[i] > 0) kill(trucks[i], SIGTERM);
+    if (trucks[i] > 0) {
+        if (kill(trucks[i], SIGTERM) == -1) {
+            perror("kill SIGTERM truck");
+        }
+    }
 }
-if (p4_pid > 0) kill(p4_pid, SIGTERM);
+if (p4_pid > 0) {
+    if (kill(p4_pid, SIGTERM) == -1) {
+        perror("kill SIGTERM p4");
+    }
+}
 
 write_report("Symulacja zakonczona");
 
