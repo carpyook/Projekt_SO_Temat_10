@@ -54,7 +54,14 @@ int main() {
         shmdt(belt); // clean up
     return 1;
     }
-    
+
+    // kolejka komunikatow
+    int msg_id = msgget(get_msg_key(), 0);
+    if (msg_id == -1) {
+        perror("Truck: msgget");
+        // kontynuuj bez kolejki
+    }
+
     // petla pracy ciezarowki
     while (!belt->shutdown && !should_exit) {
 
@@ -120,6 +127,13 @@ int main() {
                     belt->express_ready = 0; // oznaczamy jako odebrana
                     printf("[TRUCK %d] !!! EKSPRES !!! Zaladowano (%.1f kg). Stan: %d\n", getpid(), exp.weight, package_count);
 
+                    // logowanie do kolejki
+                    if (msg_id != -1) {
+                        char log_msg[MSG_MAX_TEXT];
+                        snprintf(log_msg, MSG_MAX_TEXT, "Truck %d zaladowal EKSPRES %.1f kg", getpid(), exp.weight);
+                        send_log_message(msg_id, sem_id, log_msg, getpid());
+                    }
+
                     sem_signal(sem_id, SEM_MUTEX); // oddanie mutexu
                     continue;
                 } 
@@ -162,8 +176,14 @@ int main() {
                    "Stan ciezarowki: %d paczek, %.1f kg, %.6f m3\n",
                    pkg.type, pkg.weight, pkg.volume,
                    package_count, current_weight, current_volume);
-            
-            
+
+            // logowanie do kolejki
+            if (msg_id != -1) {
+                char log_msg[MSG_MAX_TEXT];
+                snprintf(log_msg, MSG_MAX_TEXT, "Truck %d zaladowal paczke %c %.1f kg", getpid(), pkg.type, pkg.weight);
+                send_log_message(msg_id, sem_id, log_msg, getpid());
+            }
+
             sem_signal(sem_id, SEM_MUTEX);  // oddaj klucz
             sem_signal(sem_id, SEM_EMPTY);  // zwolnij miejsce
             
@@ -173,6 +193,14 @@ int main() {
         if (package_count > 0) {
             belt->total_trucks_sent++;
             printf("[TRUCK %d] ODJAZD! %d paczek, %.1f kg\n", getpid(), package_count, current_weight);
+
+            // logowanie do kolejki
+            if (msg_id != -1) {
+                char log_msg[MSG_MAX_TEXT];
+                snprintf(log_msg, MSG_MAX_TEXT, "Truck %d odjechal z %d paczkami (%.1f kg)", getpid(), package_count, current_weight);
+                send_log_message(msg_id, sem_id, log_msg, getpid());
+            }
+
             sem_signal(sem_id, SEM_RAMP);
 
             sleep(RETURN_TIME);

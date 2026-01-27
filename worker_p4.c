@@ -47,6 +47,13 @@ int main() {
         return 1;
     }
 
+    // kolejka komunikatow
+    int msg_id = msgget(get_msg_key(), 0);
+    if (msg_id == -1) {
+        perror("P4: msgget");
+        // kontynuuj bez kolejki
+    }
+
     while(!should_exit && !belt->shutdown) {
         pause(); // czekaj na sygnal
 
@@ -69,9 +76,16 @@ int main() {
             
             belt->express_pkg = pkg;
             belt->express_ready = 1; // ustawiamy dla ciezarowki
-            
+
             printf("[P4] Paczka ekspresowa (%.1f kg) gotowa!\n", pkg.weight);
-            
+
+            // logowanie do kolejki
+            if (msg_id != -1) {
+                char log_msg[MSG_MAX_TEXT];
+                snprintf(log_msg, MSG_MAX_TEXT, "P4 przygotowal ekspres %.1f kg", pkg.weight);
+                send_log_message(msg_id, sem_id, log_msg, getpid());
+            }
+
             sem_signal(sem_id, SEM_MUTEX);
             
             // obudzenie ciezarowki

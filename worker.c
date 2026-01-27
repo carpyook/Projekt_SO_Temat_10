@@ -53,8 +53,15 @@ int main(int argc, char *argv[]) {
     if (sem_id == -1) {
         perror("Worker: semget");
         shmdt(belt);  // clean up
-    return 1;
-    }   
+        return 1;
+    }
+
+    // kolejka komunikatow
+    int msg_id = msgget(get_msg_key(), 0);
+    if (msg_id == -1) {
+        perror("Worker: msgget");
+        // kontynuuj bez kolejki
+    }
 
     // petla pracy
     while (!belt->shutdown && !should_exit) {
@@ -125,6 +132,12 @@ int main(int argc, char *argv[]) {
         printf("[P%c] Polozono paczke (Waga: %.1f). Stan tasmy: %d/%d szt, %.1f kg\n",
             type, pkg.weight, belt->current_count, MAX_BUFFER_SIZE, belt->current_weight);
 
+        // logowanie do kolejki
+        if (msg_id != -1) {
+            char log_msg[MSG_MAX_TEXT];
+            snprintf(log_msg, MSG_MAX_TEXT, "Worker %c polozyl paczke %.1f kg", type, pkg.weight);
+            send_log_message(msg_id, sem_id, log_msg, getpid());
+        }
 
        sem_signal(sem_id, SEM_MUTEX); // oddaj klucz do pamieci
        sem_signal(sem_id, SEM_FULL);  // powiadom ciezarowke, ze jest nowa paczka (FULL + 1)
