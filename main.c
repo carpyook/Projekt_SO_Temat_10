@@ -176,6 +176,27 @@ check_error(semctl(sem_id, SEM_REPORT, SETVAL, arg), "blad init REPORT");
 arg.val = MAX_MSG_QUEUE;
 check_error(semctl(sem_id, SEM_MSG_GUARD, SETVAL, arg), "blad init MSG_GUARD");
 
+// uruchomienie loggera jako pierwszy
+printf("[MAIN] Uruchamiam proces logowania...\n");
+pid_t logger_pid = fork();
+if (logger_pid == -1) {
+    perror("fork logger");
+    semctl(sem_id, 0, IPC_RMID);
+    msgctl(msg_id, IPC_RMID, NULL);
+    shmdt(belt);
+    shmctl(shm_id, IPC_RMID, NULL);
+    exit(EXIT_FAILURE);
+}
+if (logger_pid == 0) {
+    execl("./logger", "logger", NULL);
+    perror("blad execl logger");
+    _exit(1);
+}
+printf("[MAIN] Uruchomiono logger (PID: %d)\n", logger_pid);
+write_report("Uruchomiono logger (PID: %d)", logger_pid);
+
+sleep(1); // daj loggerowi czas na start
+
 // pracownik ekspres przed innymi
 printf("[MAIN] Uruchamiam pracownika P4 (Ekspres)...\n");
 pid_t p4_pid = fork();
@@ -332,10 +353,27 @@ if (p4_pid > 0) {
     }
 }
 
-write_report("Symulacja zakonczona");
+// czekanie na zakonczenie wszystkich procesow (poza loggerem)
+printf("[MAIN] Czekam na zakonczenie procesow...\n");
+int processes_left = NUM_WORKERS + NUM_TRUCKS + 1; // workers + trucks + p4
+while (processes_left > 0 && wait(NULL) > 0) {
+    processes_left--;
+}
 
-// czekanie na posprzatanie
-while(wait(NULL) > 0);
+// danie loggerowi czasu na odebranie pozostalych logow
+sleep(2);
+
+// zabijanie loggera
+printf("[MAIN] Wysylam SIGTERM do loggera...\n");
+if (logger_pid > 0) {
+    if (kill(logger_pid, SIGTERM) == -1) {
+        perror("kill SIGTERM logger");
+    }
+}
+
+wait(NULL);
+
+write_report("Symulacja zakonczona");
 
 printf("\n=== STATYSTYKI ===\n");
 printf("Zaladowano paczek: %d\n", belt->total_packages);
