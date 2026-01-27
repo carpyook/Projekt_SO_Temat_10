@@ -331,6 +331,27 @@ for (int i = 0; i < MAX_BUFFER_SIZE; i++) {
 
 sleep(1);
 
+// czekaj az trucks oproznia tasme
+printf("[MAIN] Czekam na oprozninie tasmy (pozostalo: %d paczek)...\n",
+       belt->current_count);
+
+int timeout = 30;
+while ((belt->current_count > 0 || belt->express_ready) && timeout > 0) {
+    sleep(1);
+    timeout--;
+    if (timeout % 5 == 0) {
+        printf("[MAIN] Pozostalo paczek: %d, timeout: %ds\n",
+               belt->current_count, timeout);
+    }
+}
+
+if (belt->current_count == 0 && !belt->express_ready) {
+    printf("[MAIN] Tasma oprozniona - wszystkie paczki rozwiezione!\n");
+} else {
+    printf("[MAIN] TIMEOUT: %d paczek zostalo na tasmie.\n",
+           belt->current_count);
+}
+
 // zabijanie procesow
 printf("[MAIN] Wysylam SIGTERM do procesow...\n");
 for (int i = 0; i < NUM_WORKERS; i++) {
@@ -355,9 +376,25 @@ if (p4_pid > 0) {
 
 // czekanie na zakonczenie wszystkich procesow (poza loggerem)
 printf("[MAIN] Czekam na zakonczenie procesow...\n");
-int processes_left = NUM_WORKERS + NUM_TRUCKS + 1; // workers + trucks + p4
-while (processes_left > 0 && wait(NULL) > 0) {
-    processes_left--;
+int wait_timeout = 15; // 15 sekund max
+while (wait_timeout > 0) {
+    pid_t result = waitpid(-1, NULL, WNOHANG);
+    if (result == 0) {
+        // brak procesow do zebrania w tej chwili, czekaj
+        sleep(1);
+        wait_timeout--;
+    } else if (result > 0) {
+        // zebrano proces
+        printf("[MAIN] Proces %d zakonczony\n", result);
+    } else {
+        // blad lub brak procesow potomnych
+        if (errno == ECHILD) {
+            printf("[MAIN] Wszystkie procesy potomne zakonczone\n");
+            break;
+        }
+        sleep(1);
+        wait_timeout--;
+    }
 }
 
 // danie loggerowi czasu na odebranie pozostalych logow

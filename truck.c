@@ -63,16 +63,23 @@ int main() {
     }
 
     // petla pracy ciezarowki
-    while (!belt->shutdown && !should_exit) {
+    // kontynuuj prace dopoki sa paczki na tasmie, nawet po shutdown
+    while ((!belt->shutdown || belt->current_count > 0 || belt->express_ready) && !should_exit) {
 
         printf("[TRUCK %d] Czekam w kolejce do rampy...\n", getpid());
 
         if (sem_wait_wrapper(sem_id, SEM_RAMP) == -1) {
-            if (belt->shutdown || should_exit) break;
+            if (should_exit) break;
             continue;
-        } 
+        }
 
-        if (belt->shutdown || should_exit) {
+        if (should_exit) {
+            sem_signal(sem_id, SEM_RAMP);
+            break;
+        }
+
+        // Sprawdz czy sa jeszcze paczki do zabrania
+        if (belt->shutdown && belt->current_count == 0 && !belt->express_ready) {
             sem_signal(sem_id, SEM_RAMP);
             break;
         }
@@ -83,9 +90,10 @@ int main() {
         float current_weight = 0.0;   // kg
         float current_volume = 0.0;   // m^3
         int package_count = 0;
-        
+
         // petla zaladunku
-        while (!belt->shutdown && !should_exit && !force_departure) {
+        // kontynuuj ladowanie nawet po shutdown, dopoki sa paczki
+        while ((!belt->shutdown || belt->current_count > 0 || belt->express_ready) && !should_exit && !force_departure) {
 
             if (current_weight >= TRUCK_CAPACITY_KG * 0.95 ||
                 current_volume >= TRUCK_CAPACITY_M3 * 0.95) {
@@ -97,18 +105,26 @@ int main() {
             printf("[TRUCK %d] Czekam na paczki...\n", getpid());
 
             if (sem_wait_wrapper(sem_id, SEM_FULL) == -1) {
-                if (force_departure || belt->shutdown || should_exit) break; 
-                continue; 
+                if (force_departure || should_exit) break;
+                if (belt->shutdown && belt->current_count == 0 && !belt->express_ready) break;
+                continue;
             }
-            
-            if (belt->shutdown || should_exit) {
+
+            if (should_exit) {
+                sem_signal(sem_id, SEM_FULL);
+                break;
+            }
+
+            // sprawdz czy sa jeszcze paczki po shutdown
+            if (belt->shutdown && belt->current_count == 0 && !belt->express_ready) {
                 sem_signal(sem_id, SEM_FULL);
                 break;
             }
 
             if (sem_wait_wrapper(sem_id, SEM_MUTEX) == -1) {
                 sem_signal(sem_id, SEM_FULL); // oddajemy paczke bo jej nie wzielismy
-                if (force_departure || belt->shutdown || should_exit) break;
+                if (force_departure || should_exit) break;
+                if (belt->shutdown && belt->current_count == 0 && !belt->express_ready) break;
                 continue;
             }
             

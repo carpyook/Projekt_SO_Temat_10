@@ -57,7 +57,7 @@ int main() {
     printf("[LOGGER] Rozpoczynam odbior logow...\n");
 
     // petla odbioru logow
-    while (!belt->shutdown && !should_exit) {
+    while (!should_exit) {
         LogMessage msg;
         int ret = receive_log_message(msg_id, sem_id, &msg);
 
@@ -82,31 +82,6 @@ int main() {
         }
     }
 
-    // przed zakonczeniem, odbierz pozostale logi
-    printf("[LOGGER] Odbieranie pozostalych logow...\n");
-    int remaining = 0;
-    while (1) {
-        LogMessage msg;
-        int ret = receive_log_message(msg_id, sem_id, &msg);
-
-        if (ret != 1) break;
-
-        remaining++;
-        struct tm *tm_info = localtime(&msg.timestamp);
-        char buffer[512];
-
-        int len = strftime(buffer, sizeof(buffer), "[%Y-%m-%d %H:%M:%S] ", tm_info);
-        len += snprintf(buffer + len, sizeof(buffer) - len, "(PID %d) %s\n",
-                      msg.sender_pid, msg.text);
-
-        if (write(fd, buffer, len) == -1) {
-            perror("Logger: write");
-        }
-    }
-
-    if (remaining > 0) {
-        printf("[LOGGER] Odebrano %d pozostalych logow.\n", remaining);
-    }
 
     close(fd);
     shmdt(belt);
