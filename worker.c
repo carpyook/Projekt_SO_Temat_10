@@ -5,13 +5,13 @@
 
 volatile sig_atomic_t should_exit = 0;
 
-void handle_sigterm(int sig) {
+void handle_sigterm(int sig) { // prosba o zakonczenie
     (void)sig;
     should_exit = 1;
 }
 
 int main(int argc, char *argv[]) {
-    if (argc < 2) {
+    if (argc < 2) { //sprawdzenie czy podano argument startowy
         fprintf(stderr, "Uzycie: %s [TYP A/B/C]\n", argv[0]);
         return 1;
 
@@ -22,11 +22,11 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    srand(time(NULL) ^ getpid());
+    srand(time(NULL) ^ getpid()); // inicjalizacja generatora libcz losowych
 
     // wybor koloru dla workera
     const char *color = (type == 'A') ? GREEN : (type == 'B') ? YELLOW : MAGENTA;
-
+    //rejestracja sygnalu
     struct sigaction sa;
     sa.sa_handler = handle_sigterm;
     sigemptyset(&sa.sa_mask);
@@ -38,7 +38,7 @@ int main(int argc, char *argv[]) {
 
     // pobranie zasobow
 
-    // pamiec
+    // pamiec wspoldzielona
     int shm_id = shmget(get_shm_key(), sizeof(SharedBelt), 0);
     if (shm_id == -1) {
         perror("Worker: shmget");
@@ -63,7 +63,6 @@ int main(int argc, char *argv[]) {
     int msg_id = msgget(get_msg_key(), 0);
     if (msg_id == -1) {
         perror("Worker: msgget");
-        // kontynuuj bez kolejki
     }
 
     // petla pracy
@@ -73,7 +72,7 @@ int main(int argc, char *argv[]) {
         pkg.type = type;
         pkg.worker_id = getpid();
 
-        // mnieszja paczka = mniejsza waga
+        // mnieszja paczka = mniejsza waga, losowanie wagi
         if (type == 'A') {
             pkg.volume = (64 * 38 * 8) / 1000000.0;
             pkg.weight = 0.1 + (rand() % 79) / 10.0;
@@ -93,17 +92,17 @@ int main(int argc, char *argv[]) {
 
         // czekaj na wolne miejsce(tasma pelna = stop)
         if (sem_wait_wrapper(sem_id, SEM_EMPTY) == -1) {
-            if (should_exit || belt->shutdown) break;
+            if (should_exit || belt->shutdown) break; // przerwane przez zamkniecie systemu
             continue;
         }
 
-        //sprawdzenie flagi
+        //sprawdzenie czy nie zamknieto magazynu w miedzyczasie
         if (belt->shutdown) {
             sem_signal(sem_id, SEM_EMPTY);
             break;
         }
 
-        //czekaj na dostep do pamieci(tylko jeden proces na raz moze pisac)
+        //czekaj na dostep do pamieci(tylko jeden proces na raz moze modyfikowac)
         if (sem_wait_wrapper(sem_id, SEM_MUTEX) == -1) {
             sem_signal(sem_id, SEM_EMPTY);
             if (should_exit || belt->shutdown) break;
@@ -135,7 +134,7 @@ int main(int argc, char *argv[]) {
         printf("%s[P%c] Polozono paczke (Waga: %.1f). Stan tasmy: %d/%d szt, %.1f kg\n" RESET,
             color, type, pkg.weight, belt->current_count, MAX_BUFFER_SIZE, belt->current_weight);
 
-        // logowanie do kolejki
+        // wyslanie logu 
         if (msg_id != -1) {
             char log_msg[MSG_MAX_TEXT];
             snprintf(log_msg, MSG_MAX_TEXT, "Worker %c polozyl paczke %.1f kg", type, pkg.weight);
@@ -143,13 +142,13 @@ int main(int argc, char *argv[]) {
         }
 
        sem_signal(sem_id, SEM_MUTEX); // oddaj klucz do pamieci
-       sem_signal(sem_id, SEM_FULL);  // powiadom ciezarowke, ze jest nowa paczka (FULL + 1)
+       sem_signal(sem_id, SEM_FULL);  // powiadom ciezarowke, ze jest nowa paczka
         
-       sleep(rand() % 3 + 1); // symulacja pracy (1-3 sekundy przerwy)
+       sleep(rand() % 3 + 1); // symulacja czasu potrzebnego na przygotowanie nastepnej paczki
     }
     
     printf("%s[P%c] Koniec pracy. \n" RESET, color, type);
-    shmdt(belt);
+    shmdt(belt);// odlaczenie pamieci wspoldzielonej
 
     return 0;
 

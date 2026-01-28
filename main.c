@@ -5,15 +5,17 @@
 #include <fcntl.h>
 #include <stdarg.h>
 
-#define NUM_WORKERS 3 // 3 pracownikow
-#define NUM_TRUCKS 3 // 3 ciezarowki
+// konfiguracja symulacji
+#define NUM_WORKERS 3 // liczba pracownikow
+#define NUM_TRUCKS 3 // liczba ciezarowek
 
+// zmienne globalne potrzebne do sprzatania w atexit/signal handlerach
 static int g_shm_id = -1;
 static int g_sem_id = -1;
 static int g_msg_id = -1;
 static SharedBelt *g_belt = NULL;
 
-void cleanup_ipc(void) {
+void cleanup_ipc(void) { // zasoby ipc zostana usuniete nawet przy bledzie
     if (g_msg_id != -1) {
         msgctl(g_msg_id, IPC_RMID, NULL);
     }
@@ -28,20 +30,21 @@ void cleanup_ipc(void) {
     }
 }
 
+// handler sigint (ctrl +C)
 void handle_sigint(int sig) {
     (void)sig;
     printf(CYAN "\n[MAIN] Otrzymano SIGINT - konczenie pracy...\n" RESET);
     if (g_belt != NULL) {
-        g_belt->shutdown = 1;
+        g_belt->shutdown = 1; // powiadomienie innych procesow przez pamiec wspoldzielona
     }
-    exit(0);
+    exit(0); // wywolanie atexit(cleanup_ipc)
 }
-
+// sprzatanie procesow zombie
 void handle_sigchld(int sig) {
     (void)sig;
-    while (waitpid(-1, NULL, WNOHANG) > 0);
+    while (waitpid(-1, NULL, WNOHANG) > 0); // whohang sprawia ze waitpid nie blokuje, jesli nie ma zombie
 }
-
+// funkja pomocnicza do zapisu pliku raportu
 void write_report(const char *format, ...) {
     int fd = open(REPORT_FILE, O_WRONLY | O_CREAT | O_APPEND, 0644);
     if (fd == -1) {
@@ -52,7 +55,7 @@ void write_report(const char *format, ...) {
     char buffer[512];
     time_t now = time(NULL);
     struct tm *tm_info = localtime(&now);
-
+// formatowanie czasu
     int len = strftime(buffer, sizeof(buffer), "[%Y-%m-%d %H:%M:%S] ", tm_info);
 
     va_list args;
@@ -72,8 +75,9 @@ void write_report(const char *format, ...) {
 }
 
 int main() {
+    // funkcja sprzatajaca
     atexit(cleanup_ipc);
-
+    // rejestracja sygnalu
     struct sigaction sa_int;
     sa_int.sa_handler = handle_sigint;
     sigemptyset(&sa_int.sa_mask);
@@ -88,12 +92,13 @@ int main() {
 
     printf(CYAN "START SYMULACJI MAGAZYNU \n" RESET);
     
-    // sprawdzenie limitu procesow
-    int needed_processes = NUM_WORKERS + NUM_TRUCKS + 2;
+    // sprawdzenie limitu procesow(czy user moze uruchomic tyle procesow)
+    int needed_processes = NUM_WORKERS + NUM_TRUCKS + 2; // +2 to P4 i Logger
     if (check_process_limit(needed_processes) == -1) {
         fprintf(stderr, "Problem z limitem procesow - kontynuuje...\n");
     }
-    
+
+    // pamiec wspoldzielona
     int shm_id = shmget(get_shm_key(), sizeof(SharedBelt), IPC_CREAT | 0600);
     g_shm_id = shm_id;
     check_error(shm_id, "error shmget"); // weryfikacja alokacji
@@ -106,7 +111,7 @@ if (belt == (void *)-1) {
 
 printf("[info] Magazyn utworzony ID pamieci: %d\n", shm_id);
 
-
+// inicjalizacja struktury tasmy
 belt->head = 0;
 belt->tail = 0;
 belt->current_count = 0;
@@ -116,7 +121,7 @@ belt->shutdown = 0;
 belt->total_packages = 0;
 belt->total_trucks_sent = 0;
 
-//zestaw 5 semaforow
+// zestaw 6 semaforow
 int sem_id = semget(get_sem_key(), NUM_SEMS, IPC_CREAT | 0600);
 g_sem_id = sem_id;
 check_error(sem_id, "error semget");
@@ -176,7 +181,9 @@ check_error(semctl(sem_id, SEM_REPORT, SETVAL, arg), "blad init REPORT");
 arg.val = MAX_MSG_QUEUE;
 check_error(semctl(sem_id, SEM_MSG_GUARD, SETVAL, arg), "blad init MSG_GUARD");
 
-// uruchomienie loggera jako pierwszy
+//uruchomienie procesow
+
+// uruchomienie loggera jako pierwszy zeby lapal logi
 printf(CYAN "[MAIN] Uruchamiam proces logowania...\n" RESET);
 pid_t logger_pid = fork();
 if (logger_pid == -1) {
@@ -195,7 +202,7 @@ if (logger_pid == 0) {
 printf(CYAN "[MAIN] Uruchomiono logger (PID: %d)\n" RESET, logger_pid);
 write_report("Uruchomiono logger (PID: %d)", logger_pid);
 
-sleep(1); // daj loggerowi czas na start
+sleep(1);
 
 // pracownik ekspres przed innymi
 printf(CYAN "[MAIN] Uruchamiam pracownika P4 (Ekspres)...\n" RESET);
@@ -290,6 +297,7 @@ while(1) {
     
     if (cmd == 1) {
         printf(CYAN "[MAIN] Wysylam nakaz odjazdu (SIGUSR1) do floty!\n" RESET);
+        // wysylamy do wszystkich, te w kolejce zignoruja, ta na rampie odjezdza
         for(int i = 0; i < NUM_TRUCKS; i++) {
             if (trucks[i] > 0) {
                 if (kill(trucks[i], SIGUSR1) == -1) {
@@ -411,7 +419,7 @@ if (logger_pid > 0) {
 wait(NULL);
 
 write_report("Symulacja zakonczona");
-
+// statystyki
 printf(GREEN "\n=== STATYSTYKI ===\n");
 printf("Zaladowano paczek: %d\n", belt->total_packages);
 printf("Wyslano ciezarowek: %d\n", belt->total_trucks_sent);

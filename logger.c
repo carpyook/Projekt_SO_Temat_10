@@ -1,10 +1,10 @@
-#define _POSIX_C_SOURCE 200809L
+#define _POSIX_C_SOURCE 200809L // dla sigaction i usleep
 #include "common.h"
 #include <signal.h>
 
-volatile sig_atomic_t should_exit = 0;
+volatile sig_atomic_t should_exit = 0; // flaga zakoczenia pracy
 
-void handle_sigterm(int sig) {
+void handle_sigterm(int sig) { // graceful shutdown
     (void)sig;
     should_exit = 1;
 }
@@ -12,14 +12,14 @@ void handle_sigterm(int sig) {
 int main() {
     printf(MAGENTA "[LOGGER] Proces logowania uruchomiony (PID: %d)\n" RESET, getpid());
 
-    // obsluga SIGTERM
+    // obsluga SIGTERM, poprawnie zamkniecie pliku przez logger
     struct sigaction sa;
     sa.sa_handler = handle_sigterm;
     sigemptyset(&sa.sa_mask);
     sa.sa_flags = 0;
     sigaction(SIGTERM, &sa, NULL);
 
-    // pobranie zasobow
+    // pobranie zasobow, pamiec wspoldzielona
     int shm_id = shmget(get_shm_key(), sizeof(SharedBelt), 0);
     if (shm_id == -1) {
         perror("Logger: shmget");
@@ -31,14 +31,14 @@ int main() {
         perror("Logger: shmat");
         return 1;
     }
-
+    // semafory dla receive_log_message i straznika
     int sem_id = semget(get_sem_key(), NUM_SEMS, 0);
     if (sem_id == -1) {
         perror("Logger: semget");
         shmdt(belt);
         return 1;
     }
-
+    // kolejka komunikatow
     int msg_id = msgget(get_msg_key(), 0);
     if (msg_id == -1) {
         perror("Logger: msgget");
@@ -70,7 +70,7 @@ int main() {
             len += snprintf(buffer + len, sizeof(buffer) - len, "(PID %d) %s\n",
                           msg.sender_pid, msg.text);
 
-            if (write(fd, buffer, len) == -1) {
+            if (write(fd, buffer, len) == -1) { // zapisz plik do raportu
                 perror("Logger: write");
             }
         } else if (ret == 0) {
@@ -82,7 +82,7 @@ int main() {
         }
     }
 
-
+    //sprzatanie
     close(fd);
     shmdt(belt);
 

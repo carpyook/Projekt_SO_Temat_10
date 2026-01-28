@@ -24,15 +24,15 @@
 #define CYAN    "\033[1;36m"
 
 #define REPORT_FILE "raport_symulacji.txt"
-#define MAX_BUFFER_SIZE 10 // K
-#define MAX_WEIGHT_BELT 200.0 //M
-#define MSG_TYPE_LOG 1
-#define MSG_MAX_TEXT 256
-#define MAX_MSG_QUEUE 100 // Maksymalna liczba wiadomosci w kolejce
+#define MAX_BUFFER_SIZE 10 // K pojemosc tasmy
+#define MAX_WEIGHT_BELT 200.0 //M maksymalny udzwig
+#define MSG_TYPE_LOG 1 // typ wiadomosci
+#define MSG_MAX_TEXT 256 // maksymalna dlugosc tekstu w logu
+#define MAX_MSG_QUEUE 100 // maksymalna liczba wiadomosci w kolejce
 
 // funkcje generujace klucze IPC przy uzyciu ftok()
 static inline key_t get_shm_key(void) {
-    key_t key = ftok(".", 'S');
+    key_t key = ftok(".", 'S'); //dla pamieci dzielonej
     if (key == -1) {
         perror("ftok shm");
         exit(EXIT_FAILURE);
@@ -41,7 +41,7 @@ static inline key_t get_shm_key(void) {
 }
 
 static inline key_t get_sem_key(void) {
-    key_t key = ftok(".", 'M');
+    key_t key = ftok(".", 'M'); // dla mutex/semafory
     if (key == -1) {
         perror("ftok sem");
         exit(EXIT_FAILURE);
@@ -50,7 +50,7 @@ static inline key_t get_sem_key(void) {
 }
 
 static inline key_t get_msg_key(void) {
-    key_t key = ftok(".", 'Q');
+    key_t key = ftok(".", 'Q'); // dla kolejki
     if (key == -1) {
         perror("ftok msg");
         exit(EXIT_FAILURE);
@@ -59,23 +59,24 @@ static inline key_t get_msg_key(void) {
 }
 
 typedef struct {
-    char type;
-    float weight;
-    float volume;
-    pid_t worker_id;
+    char type; // A B C lub E
+    float weight; // waga w kg
+    float volume; // objetosc w m3
+    pid_t worker_id; // ID procesu ktory stworzyl paczke do raportu
 } Package;
 
+//glowna struktura przechowywana w pamieci wspoldzielonej, dostep maja wszystkie procesy
 typedef struct {
     Package buffer[MAX_BUFFER_SIZE];
-    int head;
-    int tail;
-    int current_count;
-    float current_weight;
+    int head; //zdejmowanie
+    int tail; // wkladanie
+    int current_count; //aktualna liczba paczek na tasmie
+    float current_weight; // aktaulna calkowita waga na tasmie
 
-    Package express_pkg; 
+    Package express_pkg; //kanal dla przesylki ekspres P4 -> Truck
     int express_ready; // 1 = paczka gotowa do odbioru, 0 = brak
-    volatile int shutdown;
-    int total_packages;
+    volatile int shutdown; // zakonczenie pracy
+    int total_packages; // statystyki
     int total_trucks_sent;
 } SharedBelt;
 
@@ -86,6 +87,8 @@ typedef struct {
     pid_t sender_pid;
     time_t timestamp;
 } LogMessage;
+
+//f unkcje pomocnicze 
 
 static void check_error(int ret, const char *msg) {
     if (ret == -1) {
@@ -104,11 +107,11 @@ union semun {
 //nazwy semaforow
 enum SemType {
     SEM_MUTEX = 0, // Dostep do pamieci (binarny 0/1)
-    SEM_EMPTY = 1, // Liczba wolnych miejsc
+    SEM_EMPTY = 1, // Liczba wolnych miejsc na tasmie (dla workera)
     SEM_FULL  = 2,  // Liczba zajetych miejsc (paczek)
-    SEM_RAMP  = 3, // Kolejka do rampy
-    SEM_REPORT = 4, // Dostep do pliku raportu
-    SEM_MSG_GUARD = 5 // Straznik kolejki komunikatow
+    SEM_RAMP  = 3, // Kolejka do rampy, tylko 1 ciezarowka laduje
+    SEM_REPORT = 4, // Zapis do pliku
+    SEM_MSG_GUARD = 5 // Straznik kolejki komunikatow, ogranicza ilosc wiad w kolejce
 };
 
 #define NUM_SEMS 6
@@ -164,21 +167,21 @@ static inline int check_process_limit(int needed) {
            (long)rl.rlim_cur, (long)rl.rlim_max, needed);
     
     if (rl.rlim_cur != RLIM_INFINITY && (long)rl.rlim_cur < needed + 10) {
-        fprintf(stderr, "[BLAD] Limit procesow moze byc niewystarczajacy!\n");
+        fprintf(stderr, "[BLAD] Limit procesow moze byc niewystarczajacy!\n"); // ostrzezenie jesli uzytkownik ma na maly limit procesow
         return -1;
     }
     
     return 0;
 }
-
-// bezpieczne wysylanie wiadomosci do kolejki z semaforem straznikiem
-// zapobiega przepelnieniu kolejki, blokuje jesli pelna
+// Obsluga kolejki komunikatow
+// bezpieczne wysylanie logu do loggera
+// zapobiega przepelnieniu kolejki -> zwraca -1
 static inline int send_log_message(int msg_id, int sem_id, const char *text, pid_t sender) {
     // pobranie klucza od straznika 
     struct sembuf guard_down;
     guard_down.sem_num = SEM_MSG_GUARD;
     guard_down.sem_op = -1;
-    guard_down.sem_flg = IPC_NOWAIT; // nie blokuj jesli pelna, zglos blad
+    guard_down.sem_flg = IPC_NOWAIT; // nie czekaj, jesli  brak miejsca
 
     if (semop(sem_id, &guard_down, 1) == -1) {
         if (errno == EAGAIN) {
@@ -194,13 +197,13 @@ static inline int send_log_message(int msg_id, int sem_id, const char *text, pid
     msg.sender_pid = sender;
     msg.timestamp = time(NULL);
     strncpy(msg.text, text, MSG_MAX_TEXT - 1);
-    msg.text[MSG_MAX_TEXT - 1] = '\0';
+    msg.text[MSG_MAX_TEXT - 1] = '\0'; // zabezpieczenie nulla
 
     size_t msg_size = sizeof(LogMessage) - sizeof(long);
 
     if (msgsnd(msg_id, &msg, msg_size, 0) == -1) {  // 0 = blokujace wyslanie
         perror("msgsnd");
-        // oddaj klucz straznika z powrotem
+        // oddaj klucz straznika z powrotem w razie bledu
         struct sembuf guard_up;
         guard_up.sem_num = SEM_MSG_GUARD;
         guard_up.sem_op = 1;

@@ -1,5 +1,5 @@
 #define _POSIX_C_SOURCE 200809L // usleep
-#define _XOPEN_SOURCE 700
+#define _XOPEN_SOURCE 700 // sigaction
 #include "common.h"
 #include <time.h>
 #include <signal.h>
@@ -7,32 +7,33 @@
 // limity ciezarowki
 #define TRUCK_CAPACITY_KG 500.0      // 500 kg
 #define TRUCK_CAPACITY_M3 30        // 30m^3
-#define RETURN_TIME 10               // czas dostawy s
+#define RETURN_TIME 10               // czas powrotu z trasy sek
 
 volatile sig_atomic_t force_departure = 0; 
 volatile sig_atomic_t should_exit = 0;
 
+// sygnal 1 od dyspozytora
 void handle_sigusr1(int sig) {
     (void)sig;
     force_departure = 1; // wymuszony odjazd
 }
-
+// graceful shutdown
 void handle_sigterm(int sig) {
     (void)sig;
     should_exit = 1;
 }
 
 int main() {
-    srand(time(NULL) ^ getpid());
+    srand(time(NULL) ^ getpid()); // inicjalizacja losowania
     printf(BLUE "[TRUCK %d] Ciezarowka podjezdza. \n" RESET, getpid());
 
-    //rejestracja sygnalu (gdy przyjdzie SIGUSR1, uruchom hanlde_sigusr1)
+    // rejestracja sygnalu (gdy przyjdzie SIGUSR1, uruchom hanlde_sigusr1)
     struct sigaction sa;
-    sa.sa_handler = handle_sigusr1;
+    sa.sa_handler = handle_sigusr1;// wymuszony odjazd
     sigemptyset(&sa.sa_mask);
     sa.sa_flags = 0; // Bez flagi SA_RESTART, zeby przerwac sem_wait
     sigaction(SIGUSR1, &sa, NULL);
-    sa.sa_handler = handle_sigterm;
+    sa.sa_handler = handle_sigterm;// zakoczenie pracy
     sigaction(SIGTERM, &sa, NULL);
 
     // pobranie zasobow
@@ -66,8 +67,10 @@ int main() {
     // kontynuuj prace dopoki sa paczki na tasmie, nawet po shutdown
     while ((!belt->shutdown || belt->current_count > 0 || belt->express_ready) && !should_exit) {
 
+        // oczekiwanie na rampie
         printf(BLUE "[TRUCK %d] Czekam w kolejce do rampy...\n" RESET, getpid());
-
+        
+        // czekaj na RAMP (szlaban)
         if (sem_wait_wrapper(sem_id, SEM_RAMP) == -1) {
             if (should_exit) break;
             continue;
@@ -78,14 +81,14 @@ int main() {
             break;
         }
 
-        // Sprawdz czy sa jeszcze paczki do zabrania
+        // sprawdz czy sa jeszcze paczki do zabrania
         if (belt->shutdown && belt->current_count == 0 && !belt->express_ready) {
             sem_signal(sem_id, SEM_RAMP);
             break;
         }
 
         printf(BLUE "[TRUCK %d] Wjechalem na rampe! Zaczynam zaladunek.\n" RESET, getpid());
-        force_departure = 0;
+        force_departure = 0; // reset
 
         float current_weight = 0.0;   // kg
         float current_volume = 0.0;   // m^3
@@ -105,7 +108,7 @@ int main() {
             printf(BLUE "[TRUCK %d] Czekam na paczki...\n" RESET, getpid());
 
             if (sem_wait_wrapper(sem_id, SEM_FULL) == -1) {
-                if (force_departure || should_exit) break;
+                if (force_departure || should_exit) break; // jesli przerwane przez sygnal lub shutdown - wyjdz
                 if (belt->shutdown && belt->current_count == 0 && !belt->express_ready) break;
                 continue;
             }
@@ -120,7 +123,7 @@ int main() {
                 sem_signal(sem_id, SEM_FULL);
                 break;
             }
-
+            // wejscie w sekcje krytyczna
             if (sem_wait_wrapper(sem_id, SEM_MUTEX) == -1) {
                 sem_signal(sem_id, SEM_FULL); // oddajemy paczke bo jej nie wzielismy
                 if (force_departure || should_exit) break;
@@ -128,14 +131,14 @@ int main() {
                 continue;
             }
             
-            //sprawdzenie czy jest ekspres
+            // sprawdzenie czy jest ekspres
             if (belt->express_ready == 1) {
                 Package exp = belt->express_pkg;
 
-                //sprawdzenie czy sie zmiesci
+                // sprawdzenie czy sie zmiesci
                 if (current_weight + exp.weight <= TRUCK_CAPACITY_KG && current_volume + exp.volume <= TRUCK_CAPACITY_M3) {
 
-                    //ladowanie ekspresu
+                    // ladowanie ekspresu
                     current_weight += exp.weight;
                     current_volume += exp.volume;
                     package_count++;
@@ -157,8 +160,6 @@ int main() {
 
             // pobierz paczke z head
             if (belt->current_count == 0) {
-                // Brak paczek mimo sygnalu - moze byc race condition
-                // NIE oddajemy SEM_FULL, bo zostal juz zuzyty
                 sem_signal(sem_id, SEM_MUTEX);
                 break; // Koniec zaladunku
             }
@@ -205,7 +206,7 @@ int main() {
             
             usleep(500000); // symulacja czasu zaladunku jednej paczki
         }
-        
+        // odjazd
         if (package_count > 0) {
             belt->total_trucks_sent++;
             printf(BLUE "[TRUCK %d] ODJAZD! %d paczek, %.1f kg\n" RESET, getpid(), package_count, current_weight);
@@ -217,20 +218,19 @@ int main() {
                 send_log_message(msg_id, sem_id, log_msg, getpid());
             }
 
-            sem_signal(sem_id, SEM_RAMP);
+            sem_signal(sem_id, SEM_RAMP); // zwolnij rampe dla nastepej
 
-            sleep(RETURN_TIME);
+            sleep(RETURN_TIME); // symulacja drogi
 
             printf(BLUE "[TRUCK %d] Wrocilem.\n" RESET, getpid());
 
         } else {
-            printf(BLUE "[TRUCK %d] Brak paczek.\n" RESET, getpid());
+            printf(BLUE "[TRUCK %d] Brak paczek.\n" RESET, getpid()); // dla pustej ciezarowki np po wymuszonymm odjezdzie z 0 paczek
             sem_signal(sem_id, SEM_RAMP);
             sleep(2);
         }       
     }
     
-    // nie dojedzie tu ale dla porządku
     printf(BLUE "[TRUCK %d] Koniec pracy. \n" RESET, getpid());
     shmdt(belt);
     return 0;
