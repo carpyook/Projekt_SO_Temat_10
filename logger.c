@@ -10,7 +10,7 @@ void handle_sigterm(int sig) {
 }
 
 int main() {
-    printf("[LOGGER] Proces logowania uruchomiony (PID: %d)\n", getpid());
+    printf(MAGENTA "[LOGGER] Proces logowania uruchomiony (PID: %d)\n" RESET, getpid());
 
     // obsluga SIGTERM
     struct sigaction sa;
@@ -54,7 +54,7 @@ int main() {
         return 1;
     }
 
-    printf("[LOGGER] Rozpoczynam odbior logow...\n");
+    printf(MAGENTA "[LOGGER] Rozpoczynam odbior logow...\n" RESET);
 
     // petla odbioru logow
     while (!should_exit) {
@@ -86,6 +86,6 @@ int main() {
     close(fd);
     shmdt(belt);
 
-    printf("[LOGGER] Koniec pracy.\n");
+    printf(MAGENTA "[LOGGER] Koniec pracy.\n" RESET);
     return 0;
 }

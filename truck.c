@@ -24,7 +24,7 @@ void handle_sigterm(int sig) {
 
 int main() {
     srand(time(NULL) ^ getpid());
-    printf("[TRUCK %d] Ciezarowka podjezdza. \n", getpid());
+    printf(BLUE "[TRUCK %d] Ciezarowka podjezdza. \n" RESET, getpid());
 
     //rejestracja sygnalu (gdy przyjdzie SIGUSR1, uruchom hanlde_sigusr1)
     struct sigaction sa;
@@ -66,7 +66,7 @@ int main() {
     // kontynuuj prace dopoki sa paczki na tasmie, nawet po shutdown
     while ((!belt->shutdown || belt->current_count > 0 || belt->express_ready) && !should_exit) {
 
-        printf("[TRUCK %d] Czekam w kolejce do rampy...\n", getpid());
+        printf(BLUE "[TRUCK %d] Czekam w kolejce do rampy...\n" RESET, getpid());
 
         if (sem_wait_wrapper(sem_id, SEM_RAMP) == -1) {
             if (should_exit) break;
@@ -84,7 +84,7 @@ int main() {
             break;
         }
 
-        printf("[TRUCK %d] Wjechalem na rampe! Zaczynam zaladunek.\n", getpid());
+        printf(BLUE "[TRUCK %d] Wjechalem na rampe! Zaczynam zaladunek.\n" RESET, getpid());
         force_departure = 0;
 
         float current_weight = 0.0;   // kg
@@ -97,12 +97,12 @@ int main() {
 
             if (current_weight >= TRUCK_CAPACITY_KG * 0.95 ||
                 current_volume >= TRUCK_CAPACITY_M3 * 0.95) {
-                printf("[TRUCK %d] Pelna!\n", getpid());
+                printf(BLUE "[TRUCK %d] Pelna!\n" RESET, getpid());
                 break;
             }
 
             // czekaj na paczke
-            printf("[TRUCK %d] Czekam na paczki...\n", getpid());
+            printf(BLUE "[TRUCK %d] Czekam na paczki...\n" RESET, getpid());
 
             if (sem_wait_wrapper(sem_id, SEM_FULL) == -1) {
                 if (force_departure || should_exit) break;
@@ -141,7 +141,7 @@ int main() {
                     package_count++;
 
                     belt->express_ready = 0; // oznaczamy jako odebrana
-                    printf("[TRUCK %d] !!! EKSPRES !!! Zaladowano (%.1f kg). Stan: %d\n", getpid(), exp.weight, package_count);
+                    printf(YELLOW "[TRUCK %d] !!! EKSPRES !!! Zaladowano (%.1f kg). Stan: %d\n" RESET, getpid(), exp.weight, package_count);
 
                     // logowanie do kolejki
                     if (msg_id != -1) {
@@ -157,10 +157,10 @@ int main() {
 
             // pobierz paczke z head
             if (belt->current_count == 0) {
+                // Brak paczek mimo sygnalu - moze byc race condition
+                // NIE oddajemy SEM_FULL, bo zostal juz zuzyty
                 sem_signal(sem_id, SEM_MUTEX);
-                sem_signal(sem_id, SEM_FULL);
-                usleep(100000);
-                continue;
+                break; // Koniec zaladunku
             }
             Package pkg = belt->buffer[belt->head];
             
@@ -168,8 +168,8 @@ int main() {
             if (current_weight + pkg.weight > TRUCK_CAPACITY_KG ||
                 current_volume + pkg.volume > TRUCK_CAPACITY_M3) {
                 
-                printf("[TRUCK] Paczka %c (%.1f kg, %.6f m3) sie NIE zmiesci. "
-                       "Koncze zaladunek.\n", 
+                printf(BLUE "[TRUCK] Paczka %c (%.1f kg, %.6f m3) sie NIE zmiesci. "
+                       "Koncze zaladunek.\n" RESET,
                        pkg.type, pkg.weight, pkg.volume);
                 
                 sem_signal(sem_id, SEM_MUTEX);
@@ -188,8 +188,8 @@ int main() {
             package_count++;
             belt->total_packages++;
             
-            printf("[TRUCK] Zaladowano paczke %c (%.1f kg, %.6f m3). "
-                   "Stan ciezarowki: %d paczek, %.1f kg, %.6f m3\n",
+            printf(BLUE "[TRUCK] Zaladowano paczke %c (%.1f kg, %.6f m3). "
+                   "Stan ciezarowki: %d paczek, %.1f kg, %.6f m3\n" RESET,
                    pkg.type, pkg.weight, pkg.volume,
                    package_count, current_weight, current_volume);
 
@@ -208,7 +208,7 @@ int main() {
         
         if (package_count > 0) {
             belt->total_trucks_sent++;
-            printf("[TRUCK %d] ODJAZD! %d paczek, %.1f kg\n", getpid(), package_count, current_weight);
+            printf(BLUE "[TRUCK %d] ODJAZD! %d paczek, %.1f kg\n" RESET, getpid(), package_count, current_weight);
 
             // logowanie do kolejki
             if (msg_id != -1) {
@@ -221,17 +221,17 @@ int main() {
 
             sleep(RETURN_TIME);
 
-            printf("[TRUCK %d] Wrocilem.\n", getpid());
+            printf(BLUE "[TRUCK %d] Wrocilem.\n" RESET, getpid());
 
         } else {
-            printf("[TRUCK %d] Brak paczek.\n", getpid());
+            printf(BLUE "[TRUCK %d] Brak paczek.\n" RESET, getpid());
             sem_signal(sem_id, SEM_RAMP);
             sleep(2);
         }       
     }
     
     // nie dojedzie tu ale dla porządku
-    printf("[TRUCK %d] Koniec pracy. \n", getpid());
+    printf(BLUE "[TRUCK %d] Koniec pracy. \n" RESET, getpid());
     shmdt(belt);
     return 0;
 }

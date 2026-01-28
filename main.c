@@ -30,7 +30,7 @@ void cleanup_ipc(void) {
 
 void handle_sigint(int sig) {
     (void)sig;
-    printf("\n[MAIN] Otrzymano SIGINT - konczenie pracy...\n");
+    printf(CYAN "\n[MAIN] Otrzymano SIGINT - konczenie pracy...\n" RESET);
     if (g_belt != NULL) {
         g_belt->shutdown = 1;
     }
@@ -86,9 +86,9 @@ int main() {
     sa_chld.sa_flags = SA_RESTART | SA_NOCLDSTOP;
     sigaction(SIGCHLD, &sa_chld, NULL);
 
-    printf("START SYMULACJI MAGAZYNU \n");
+    printf(CYAN "START SYMULACJI MAGAZYNU \n" RESET);
     
-    // Sprawdzenie limitu procesow
+    // sprawdzenie limitu procesow
     int needed_processes = NUM_WORKERS + NUM_TRUCKS + 2;
     if (check_process_limit(needed_processes) == -1) {
         fprintf(stderr, "Problem z limitem procesow - kontynuuje...\n");
@@ -177,7 +177,7 @@ arg.val = MAX_MSG_QUEUE;
 check_error(semctl(sem_id, SEM_MSG_GUARD, SETVAL, arg), "blad init MSG_GUARD");
 
 // uruchomienie loggera jako pierwszy
-printf("[MAIN] Uruchamiam proces logowania...\n");
+printf(CYAN "[MAIN] Uruchamiam proces logowania...\n" RESET);
 pid_t logger_pid = fork();
 if (logger_pid == -1) {
     perror("fork logger");
@@ -192,13 +192,13 @@ if (logger_pid == 0) {
     perror("blad execl logger");
     _exit(1);
 }
-printf("[MAIN] Uruchomiono logger (PID: %d)\n", logger_pid);
+printf(CYAN "[MAIN] Uruchomiono logger (PID: %d)\n" RESET, logger_pid);
 write_report("Uruchomiono logger (PID: %d)", logger_pid);
 
 sleep(1); // daj loggerowi czas na start
 
 // pracownik ekspres przed innymi
-printf("[MAIN] Uruchamiam pracownika P4 (Ekspres)...\n");
+printf(CYAN "[MAIN] Uruchamiam pracownika P4 (Ekspres)...\n" RESET);
 pid_t p4_pid = fork();
 if (p4_pid == -1) {
     perror("fork p4");
@@ -212,11 +212,11 @@ if (p4_pid == 0) {
     perror("blad execl worker_p4");
     _exit(1);
 }
-printf("[MAIN] Uruchomiono pracownika P4 (PID: %d)\n", p4_pid);
+printf(CYAN "[MAIN] Uruchomiono pracownika P4 (PID: %d)\n" RESET, p4_pid);
 write_report("Uruchomiono pracownika P4 (Ekspres, PID: %d)", p4_pid);
 
 // uruchamianie pracownikow
-printf("[MAIN] Uruchamiam pracownikow...\n");
+printf(CYAN "[MAIN] Uruchamiam pracownikow...\n" RESET);
 pid_t workers[NUM_WORKERS];
 char types[] = {'A', 'B', 'C'};
 for (int i = 0; i < NUM_WORKERS; i++) {
@@ -232,12 +232,12 @@ for (int i = 0; i < NUM_WORKERS; i++) {
         perror("execl worker");
         _exit(1);
     }
-    printf("[MAIN] Uruchomiono pracownika P%d (PID: %d, typ: %c)\n", i + 1, workers[i], types[i]);
+    printf(CYAN "[MAIN] Uruchomiono pracownika P%d (PID: %d, typ: %c)\n" RESET, i + 1, workers[i], types[i]);
     write_report("Uruchomiono pracownika P%d (typ %c, PID: %d)", i + 1, types[i], workers[i]);
 }
 
 // tworzenie floty ciezarowek
-printf("[MAIN] Uruchamiam flote %d ciezarowek...\n", NUM_TRUCKS);
+printf(CYAN "[MAIN] Uruchamiam flote %d ciezarowek...\n" RESET, NUM_TRUCKS);
 pid_t trucks[NUM_TRUCKS];
 for (int i = 0; i < NUM_TRUCKS; i++) {
     trucks[i] = fork();
@@ -251,7 +251,7 @@ for (int i = 0; i < NUM_TRUCKS; i++) {
         perror("execl truck");
         _exit(1);
     }
-    printf("[MAIN] Uruchomiono ciezarowke %d (PID: %d)\n", i + 1, trucks[i]);
+    printf(CYAN "[MAIN] Uruchomiono ciezarowke %d (PID: %d)\n" RESET, i + 1, trucks[i]);
     write_report("Uruchomiono ciezarowke %d (PID: %d)", i + 1, trucks[i]);
 }
 
@@ -289,7 +289,7 @@ while(1) {
     cmd = (int)val;
     
     if (cmd == 1) {
-        printf("[MAIN] Wysylam nakaz odjazdu (SIGUSR1) do floty!\n");
+        printf(CYAN "[MAIN] Wysylam nakaz odjazdu (SIGUSR1) do floty!\n" RESET);
         for(int i = 0; i < NUM_TRUCKS; i++) {
             if (trucks[i] > 0) {
                 if (kill(trucks[i], SIGUSR1) == -1) {
@@ -300,7 +300,7 @@ while(1) {
         write_report("DYSPOZYTOR: Sygnal 1 - wymuszony odjazd");
     }
     else if (cmd == 2) {
-        printf("[MAIN] Zamawiam ekspres (SIGUSR2)!\n");
+        printf(CYAN "[MAIN] Zamawiam ekspres (SIGUSR2)!\n" RESET);
         if (p4_pid > 0) {
             if (kill(p4_pid, SIGUSR2) == -1) {
                 perror("kill SIGUSR2");
@@ -309,14 +309,14 @@ while(1) {
         write_report("DYSPOZYTOR: Sygnal 2 - zamowienie ekspresu");
     }
     else if (cmd == 3) {
-        printf("[MAIN] Koniec pracy!\n");
+        printf(CYAN "[MAIN] Koniec pracy!\n" RESET);
         write_report("DYSPOZYTOR: Sygnal 3 - koniec pracy");
         break;
     }
 }
     
 // graceful shutdown
-printf("[MAIN] Ustawiam flage zakonczenia pracy...\n");
+printf(CYAN "[MAIN] Ustawiam flage zakonczenia pracy...\n" RESET);
 belt->shutdown = 1;
 
 sleep(1);
@@ -332,7 +332,7 @@ for (int i = 0; i < MAX_BUFFER_SIZE; i++) {
 sleep(1);
 
 // czekaj az trucks oproznia tasme
-printf("[MAIN] Czekam na oprozninie tasmy (pozostalo: %d paczek)...\n",
+printf(CYAN "[MAIN] Czekam na oprozninie tasmy (pozostalo: %d paczek)...\n" RESET,
        belt->current_count);
 
 int timeout = 30;
@@ -340,42 +340,42 @@ while ((belt->current_count > 0 || belt->express_ready) && timeout > 0) {
     sleep(1);
     timeout--;
     if (timeout % 5 == 0) {
-        printf("[MAIN] Pozostalo paczek: %d, timeout: %ds\n",
+        printf(CYAN "[MAIN] Pozostalo paczek: %d, timeout: %ds\n" RESET,
                belt->current_count, timeout);
     }
 }
 
 if (belt->current_count == 0 && !belt->express_ready) {
-    printf("[MAIN] Tasma oprozniona - wszystkie paczki rozwiezione!\n");
+    printf(CYAN "[MAIN] Tasma oprozniona - wszystkie paczki rozwiezione!\n" RESET);
 } else {
-    printf("[MAIN] TIMEOUT: %d paczek zostalo na tasmie.\n",
+    printf(CYAN "[MAIN] TIMEOUT: %d paczek zostalo na tasmie.\n" RESET,
            belt->current_count);
 }
 
 // zabijanie procesow
-printf("[MAIN] Wysylam SIGTERM do procesow...\n");
+printf(CYAN "[MAIN] Wysylam SIGTERM do procesow...\n" RESET);
 for (int i = 0; i < NUM_WORKERS; i++) {
     if (workers[i] > 0) {
-        if (kill(workers[i], SIGTERM) == -1) {
+        if (kill(workers[i], SIGTERM) == -1 && errno != ESRCH) {
             perror("kill SIGTERM worker");
         }
     }
 }
 for (int i = 0; i < NUM_TRUCKS; i++) {
     if (trucks[i] > 0) {
-        if (kill(trucks[i], SIGTERM) == -1) {
+        if (kill(trucks[i], SIGTERM) == -1 && errno != ESRCH) {
             perror("kill SIGTERM truck");
         }
     }
 }
 if (p4_pid > 0) {
-    if (kill(p4_pid, SIGTERM) == -1) {
+    if (kill(p4_pid, SIGTERM) == -1 && errno != ESRCH) {
         perror("kill SIGTERM p4");
     }
 }
 
 // czekanie na zakonczenie wszystkich procesow (poza loggerem)
-printf("[MAIN] Czekam na zakonczenie procesow...\n");
+printf(CYAN "[MAIN] Czekam na zakonczenie procesow...\n" RESET);
 int wait_timeout = 15; // 15 sekund max
 while (wait_timeout > 0) {
     pid_t result = waitpid(-1, NULL, WNOHANG);
@@ -385,11 +385,11 @@ while (wait_timeout > 0) {
         wait_timeout--;
     } else if (result > 0) {
         // zebrano proces
-        printf("[MAIN] Proces %d zakonczony\n", result);
+        printf(CYAN "[MAIN] Proces %d zakonczony\n" RESET, result);
     } else {
         // blad lub brak procesow potomnych
         if (errno == ECHILD) {
-            printf("[MAIN] Wszystkie procesy potomne zakonczone\n");
+            printf(CYAN "[MAIN] Wszystkie procesy potomne zakonczone\n" RESET);
             break;
         }
         sleep(1);
@@ -401,9 +401,9 @@ while (wait_timeout > 0) {
 sleep(2);
 
 // zabijanie loggera
-printf("[MAIN] Wysylam SIGTERM do loggera...\n");
+printf(CYAN "[MAIN] Wysylam SIGTERM do loggera...\n" RESET);
 if (logger_pid > 0) {
-    if (kill(logger_pid, SIGTERM) == -1) {
+    if (kill(logger_pid, SIGTERM) == -1 && errno != ESRCH) {
         perror("kill SIGTERM logger");
     }
 }
@@ -412,10 +412,10 @@ wait(NULL);
 
 write_report("Symulacja zakonczona");
 
-printf("\n=== STATYSTYKI ===\n");
+printf(GREEN "\n=== STATYSTYKI ===\n");
 printf("Zaladowano paczek: %d\n", belt->total_packages);
 printf("Wyslano ciezarowek: %d\n", belt->total_trucks_sent);
-printf("==================\n\n");
+printf("==================\n\n" RESET);
 
 write_report("Zaladowano paczek: %d", belt->total_packages);
 write_report("Wyslano ciezarowek: %d", belt->total_trucks_sent);
@@ -435,6 +435,6 @@ check_error(shmdt(belt), "blad shmdt"); // odlaczenie wskaznika
 
 check_error(shmctl(shm_id, IPC_RMID, NULL), "blad shmctl"); // usuwanie segmentu
 
-printf("KONIEC SYMULACJI \n");
+printf(GREEN "KONIEC SYMULACJI \n" RESET);
 return 0;
 }

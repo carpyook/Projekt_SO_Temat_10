@@ -18,7 +18,7 @@ void handle_sigterm(int sig) {
 
 int main() {
     srand(time(NULL) ^ getpid());
-    printf("[P4] Pracownik Ekspresowy gotowy (PID: %d).\n", getpid());
+    printf(YELLOW "[P4] Pracownik Ekspresowy gotowy (PID: %d).\n" RESET, getpid());
     
     struct sigaction sa;
     sa.sa_handler = handle_sigusr2;
@@ -60,7 +60,7 @@ int main() {
         if (should_exit || belt->shutdown) break;
 
         if (express_order) {
-            printf("[P4] Otrzymalem sygnal! Przygotowuje ekspres.\n");
+            printf(YELLOW "[P4] Otrzymalem sygnal! Przygotowuje ekspres.\n" RESET);
             
             Package pkg;
             pkg.type = 'E'; // ekspres
@@ -77,7 +77,7 @@ int main() {
             belt->express_pkg = pkg;
             belt->express_ready = 1; // ustawiamy dla ciezarowki
 
-            printf("[P4] Paczka ekspresowa (%.1f kg) gotowa!\n", pkg.weight);
+            printf(YELLOW "[P4] Paczka ekspresowa (%.1f kg) gotowa!\n" RESET, pkg.weight);
 
             // logowanie do kolejki
             if (msg_id != -1) {
@@ -95,7 +95,7 @@ int main() {
         }
     }
 
-    printf("[P4] Koniec pracy.\n");
+    printf(YELLOW "[P4] Koniec pracy.\n" RESET);
     shmdt(belt);
     return 0;
 }

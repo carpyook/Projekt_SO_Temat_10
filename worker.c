@@ -24,6 +24,9 @@ int main(int argc, char *argv[]) {
 
     srand(time(NULL) ^ getpid());
 
+    // wybor koloru dla workera
+    const char *color = (type == 'A') ? GREEN : (type == 'B') ? YELLOW : MAGENTA;
+
     struct sigaction sa;
     sa.sa_handler = handle_sigterm;
     sigemptyset(&sa.sa_mask);
@@ -31,7 +34,7 @@ int main(int argc, char *argv[]) {
     sigaction(SIGTERM, &sa, NULL);
 
 
-    printf("[P%c] pracownik uruchomiony, PID: %d\n", type, getpid());
+    printf("%s[P%c] pracownik uruchomiony, PID: %d\n" RESET, color, type, getpid());
 
     // pobranie zasobow
 
@@ -84,7 +87,7 @@ int main(int argc, char *argv[]) {
             pkg.weight = 16.1 + (rand() % 89) / 10.0;
         }
 
-        printf("[P%c] Mam paczke %.1f kg, %.6f m3. Czekam na tasme...\n", type, pkg.weight, pkg.volume);
+        printf("%s[P%c] Mam paczke %.1f kg, %.6f m3. Czekam na tasme...\n" RESET, color, type, pkg.weight, pkg.volume);
 
         
 
@@ -109,7 +112,7 @@ int main(int argc, char *argv[]) {
     
         // sprawdzenie udzwigu tasmy (limit M)
         if (belt->current_weight + pkg.weight > MAX_WEIGHT_BELT) {
-            printf("[P%c] Tasma przeciazona! Czekam...\n", type);          
+            printf("%s[P%c] Tasma przeciazona! Czekam...\n" RESET, color, type);          
             
             // oddanie semaforow, zeby ciezarowka mogla cos zdjac
             sem_signal(sem_id, SEM_MUTEX);
@@ -129,8 +132,8 @@ int main(int argc, char *argv[]) {
         belt->current_count++;
         belt->current_weight += pkg.weight;
 
-        printf("[P%c] Polozono paczke (Waga: %.1f). Stan tasmy: %d/%d szt, %.1f kg\n",
-            type, pkg.weight, belt->current_count, MAX_BUFFER_SIZE, belt->current_weight);
+        printf("%s[P%c] Polozono paczke (Waga: %.1f). Stan tasmy: %d/%d szt, %.1f kg\n" RESET,
+            color, type, pkg.weight, belt->current_count, MAX_BUFFER_SIZE, belt->current_weight);
 
         // logowanie do kolejki
         if (msg_id != -1) {
@@ -145,7 +148,7 @@ int main(int argc, char *argv[]) {
        sleep(rand() % 3 + 1); // symulacja pracy (1-3 sekundy przerwy)
     }
     
-    printf("[P%c] Koniec pracy. \n", type);
+    printf("%s[P%c] Koniec pracy. \n" RESET, color, type);
     shmdt(belt);
 
     return 0;
