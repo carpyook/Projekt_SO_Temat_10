@@ -1,6 +1,8 @@
 #ifndef COMMON_H
 #define COMMON_H
 
+#define _DEFAULT_SOURCE
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -88,9 +90,9 @@ typedef struct {
     time_t timestamp;
 } LogMessage;
 
-//f unkcje pomocnicze 
+//funkcje pomocnicze
 
-static void check_error(int ret, const char *msg) {
+static inline void check_error(int ret, const char *msg) {
     if (ret == -1) {
         perror(msg);
         exit(EXIT_FAILURE);
@@ -116,7 +118,7 @@ enum SemType {
 
 #define NUM_SEMS 6
 //funkcja P
-static void sem_wait(int sem_id, int sem_num) {
+static inline void sem_wait(int sem_id, int sem_num) {
     struct sembuf op;
     op.sem_num = sem_num;
     op.sem_op = -1;
@@ -128,7 +130,7 @@ static void sem_wait(int sem_id, int sem_num) {
 }
 
 //funkcja V
-static void sem_signal(int sem_id, int sem_num) {
+static inline void sem_signal(int sem_id, int sem_num) {
     struct sembuf op;
     op.sem_num = sem_num;
     op.sem_op = 1; // Dodaj 1
