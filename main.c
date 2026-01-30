@@ -6,7 +6,8 @@
 #include <stdarg.h>
 
 // konfiguracja symulacji
-#define NUM_WORKERS 3 // liczba pracownikow
+static const char WORKER_TYPES[] = {'A', 'B', 'C'};
+#define NUM_WORKERS ((int)(sizeof(WORKER_TYPES) / sizeof(WORKER_TYPES[0])))
 #define NUM_TRUCKS 3 // liczba ciezarowek
 
 // zmienne globalne potrzebne do sprzatania w atexit/signal handlerach
@@ -225,7 +226,6 @@ write_report("Uruchomiono pracownika P4 (Ekspres, PID: %d)", p4_pid);
 // uruchamianie pracownikow
 printf(CYAN "[MAIN] Uruchamiam pracownikow...\n" RESET);
 pid_t workers[NUM_WORKERS];
-char types[] = {'A', 'B', 'C'};
 for (int i = 0; i < NUM_WORKERS; i++) {
     workers[i] = fork();
     if (workers[i] == -1) {
@@ -234,13 +234,13 @@ for (int i = 0; i < NUM_WORKERS; i++) {
         continue;
     }
     if (workers[i] == 0) {
-        char type_str[2] = {types[i], '\0'};
+        char type_str[2] = {WORKER_TYPES[i], '\0'};
         execl("./worker", "worker", type_str, NULL);
         perror("execl worker");
         _exit(1);
     }
-    printf(CYAN "[MAIN] Uruchomiono pracownika P%d (PID: %d, typ: %c)\n" RESET, i + 1, workers[i], types[i]);
-    write_report("Uruchomiono pracownika P%d (typ %c, PID: %d)", i + 1, types[i], workers[i]);
+    printf(CYAN "[MAIN] Uruchomiono pracownika P%d (PID: %d, typ: %c)\n" RESET, i + 1, workers[i], WORKER_TYPES[i]);
+    write_report("Uruchomiono pracownika P%d (typ %c, PID: %d)", i + 1, WORKER_TYPES[i], workers[i]);
 }
 
 // tworzenie floty ciezarowek
