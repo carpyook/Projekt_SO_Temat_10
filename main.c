@@ -93,10 +93,10 @@ int main() {
 
     printf(CYAN "START SYMULACJI MAGAZYNU \n" RESET);
     
-    // sprawdzenie limitu procesow(czy user moze uruchomic tyle procesow)
+    // sprawdzenie limitu procesow
     int needed_processes = NUM_WORKERS + NUM_TRUCKS + 2; // +2 to P4 i Logger
     if (check_process_limit(needed_processes) == -1) {
-        fprintf(stderr, "Problem z limitem procesow - kontynuuje...\n");
+        fprintf(stderr, "Problem z limitem procesow  \n"); // ostrzezenie
     }
 
     // pamiec wspoldzielona
@@ -203,6 +203,7 @@ if (logger_pid == 0) {
 printf(CYAN "[MAIN] Uruchomiono logger (PID: %d)\n" RESET, logger_pid);
 write_report("Uruchomiono logger (PID: %d)", logger_pid);
 
+// czas na inicjalizacje loggera (otwarcie pliku i kolejki)
 sleep(1);
 
 // pracownik ekspres przed innymi
@@ -324,9 +325,10 @@ while(1) {
 }
     
 // graceful shutdown
-printf(CYAN "[MAIN] Ustawiam flage zakonczenia pracy...\n" RESET);
+printf(CYAN "[MAIN] Ustawiam zakonczenie pracy...\n" RESET);
 belt->shutdown = 1;
 
+// czas na wyslanie shutdown do procesow
 sleep(1);
 
 // odblokuj procesy czekające na semaforach
@@ -337,20 +339,18 @@ for (int i = 0; i < MAX_BUFFER_SIZE; i++) {
     sem_signal(sem_id, SEM_EMPTY);
 }
 
+// czas na wybudzenie procesow czekajacych na semaforach
 sleep(1);
 
 // czekaj az trucks oproznia tasme
 printf(CYAN "[MAIN] Czekam na oprozninie tasmy (pozostalo: %d paczek)...\n" RESET,
        belt->current_count);
 
-int timeout = 30;
-while ((belt->current_count > 0 || belt->express_ready) && timeout > 0) {
-    sleep(1);
-    timeout--;
-    if (timeout % 5 == 0) {
-        printf(CYAN "[MAIN] Pozostalo paczek: %d, timeout: %ds\n" RESET,
-               belt->current_count, timeout);
-    }
+long iterations = 0;
+long max_iterations = 100000000L; // zabezpieczenie przed nieskonczona petla
+
+while ((belt->current_count > 0 || belt->express_ready) && iterations < max_iterations) {
+    iterations++;
 }
 
 if (belt->current_count == 0 && !belt->express_ready) {
@@ -384,28 +384,23 @@ if (p4_pid > 0) {
 
 // czekanie na zakonczenie wszystkich procesow (poza loggerem)
 printf(CYAN "[MAIN] Czekam na zakonczenie procesow...\n" RESET);
-int wait_timeout = 15; // 15 sekund max
-while (wait_timeout > 0) {
+long wait_iterations = 0;
+long max_wait_iterations = 50000000L; // zabezpieczenie
+
+while (wait_iterations < max_wait_iterations) {
     pid_t result = waitpid(-1, NULL, WNOHANG);
-    if (result == 0) {
-        // brak procesow do zebrania w tej chwili, czekaj
-        sleep(1);
-        wait_timeout--;
-    } else if (result > 0) {
+    if (result > 0) {
         // zebrano proces
         printf(CYAN "[MAIN] Proces %d zakonczony\n" RESET, result);
-    } else {
-        // blad lub brak procesow potomnych
-        if (errno == ECHILD) {
-            printf(CYAN "[MAIN] Wszystkie procesy potomne zakonczone\n" RESET);
-            break;
-        }
-        sleep(1);
-        wait_timeout--;
+    } else if (result == -1 && errno == ECHILD) {
+        // brak procesow potomnych
+        printf(CYAN "[MAIN] Wszystkie procesy potomne zakonczone\n" RESET);
+        break;
     }
+    wait_iterations++;
 }
 
-// danie loggerowi czasu na odebranie pozostalych logow
+// czas na odebranie przez logger pozostalych logow z kolejki
 sleep(2);
 
 // zabijanie loggera

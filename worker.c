@@ -117,7 +117,7 @@ int main(int argc, char *argv[]) {
             sem_signal(sem_id, SEM_MUTEX);
             sem_signal(sem_id, SEM_EMPTY); 
             
-            sleep(2); // odczekaj chwile i sprobuj ponownie
+            sleep(2); // oczekiwanie az ciezarowka zdejmie paczki z tasmy
             continue; 
         }  
         

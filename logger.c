@@ -74,8 +74,8 @@ int main() {
                 perror("Logger: write");
             }
         } else if (ret == 0) {
-            // brak wiadomosci, czekaj chwile
-            usleep(100000); // 0.1s
+            // brak wiadomosci w kolejce
+            usleep(100000); // oczekiwanie na nowe logi (0.1s)
         } else {
             // blad
             break;

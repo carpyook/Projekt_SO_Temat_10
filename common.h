@@ -165,9 +165,6 @@ static inline int check_process_limit(int needed) {
         return -1;
     }
     
-    printf("[INFO] Limit procesow: soft=%ld, hard=%ld, potrzeba=%d\n", 
-           (long)rl.rlim_cur, (long)rl.rlim_max, needed);
-    
     if (rl.rlim_cur != RLIM_INFINITY && (long)rl.rlim_cur < needed + 10) {
         fprintf(stderr, "[BLAD] Limit procesow moze byc niewystarczajacy!\n"); // ostrzezenie jesli uzytkownik ma na maly limit procesow
         return -1;

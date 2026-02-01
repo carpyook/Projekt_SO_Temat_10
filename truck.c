@@ -98,8 +98,8 @@ int main() {
         // kontynuuj ladowanie nawet po shutdown, dopoki sa paczki
         while ((!belt->shutdown || belt->current_count > 0 || belt->express_ready) && !should_exit && !force_departure) {
 
-            if (current_weight >= TRUCK_CAPACITY_KG * 0.95 ||
-                current_volume >= TRUCK_CAPACITY_M3 * 0.95) {
+            if (current_weight >= TRUCK_CAPACITY_KG ||
+                current_volume >= TRUCK_CAPACITY_M3) {
                 printf(BLUE "[TRUCK %d] Pelna!\n" RESET, getpid());
                 break;
             }
@@ -208,7 +208,11 @@ int main() {
         }
         // odjazd
         if (package_count > 0) {
+            // ochrona licznika mutexem
+            sem_wait(sem_id, SEM_MUTEX);
             belt->total_trucks_sent++;
+            sem_signal(sem_id, SEM_MUTEX);
+
             printf(BLUE "[TRUCK %d] ODJAZD! %d paczek, %.1f kg\n" RESET, getpid(), package_count, current_weight);
 
             // logowanie do kolejki
@@ -227,7 +231,7 @@ int main() {
         } else {
             printf(BLUE "[TRUCK %d] Brak paczek.\n" RESET, getpid()); // dla pustej ciezarowki np po wymuszonymm odjezdzie z 0 paczek
             sem_signal(sem_id, SEM_RAMP);
-            sleep(2);
+            sleep(2); // oczekiwanie przed ponowna proba (pusta ciezarowka)
         }       
     }
     
