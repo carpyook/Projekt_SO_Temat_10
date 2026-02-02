@@ -85,7 +85,9 @@ int main() {
             if (msg_id != -1) {
                 char log_msg[MSG_MAX_TEXT];
                 snprintf(log_msg, MSG_MAX_TEXT, "P4 przygotowal ekspres %.1f kg", pkg.weight);
-                send_log_message(msg_id, sem_id, log_msg, getpid());
+                if (send_log_message(msg_id, sem_id, log_msg, getpid()) == -1) {
+                    printf(RED "[P4] WARN: Kolejka komunikatow pelna - log odrzucony!\n" RESET);
+                }
             }
             // wyjscie z sekcji krytycznej 
             sem_signal(sem_id, SEM_MUTEX);

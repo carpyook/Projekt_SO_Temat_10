@@ -73,6 +73,8 @@ int main() {
             if (write(fd, buffer, len) == -1) { // zapisz plik do raportu
                 perror("Logger: write");
             }
+
+            // usleep(100000); 0.1s opoznienia po kazdej wiadomosci do testu przepelnienia kolejki
         } else if (ret == 0) {
             // brak wiadomosci w kolejce
             usleep(100000); // oczekiwanie na nowe logi (0.1s)

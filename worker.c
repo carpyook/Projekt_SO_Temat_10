@@ -134,11 +134,13 @@ int main(int argc, char *argv[]) {
         printf("%s[P%c] Polozono paczke (Waga: %.1f). Stan tasmy: %d/%d szt, %.1f kg\n" RESET,
             color, type, pkg.weight, belt->current_count, MAX_BUFFER_SIZE, belt->current_weight);
 
-        // wyslanie logu 
+        // wyslanie logu
         if (msg_id != -1) {
             char log_msg[MSG_MAX_TEXT];
             snprintf(log_msg, MSG_MAX_TEXT, "Worker %c polozyl paczke %.1f kg", type, pkg.weight);
-            send_log_message(msg_id, sem_id, log_msg, getpid());
+            if (send_log_message(msg_id, sem_id, log_msg, getpid()) == -1) {
+                printf(RED "[P%c] WARN: Kolejka komunikatow pelna - log odrzucony!\n" RESET, type);
+            }
         }
 
        sem_signal(sem_id, SEM_MUTEX); // oddaj klucz do pamieci

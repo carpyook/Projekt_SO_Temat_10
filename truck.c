@@ -64,25 +64,27 @@ int main() {
     }
 
     // petla pracy ciezarowki
-    // kontynuuj prace dopoki sa paczki na tasmie, nawet po shutdown
-    while ((!belt->shutdown || belt->current_count > 0 || belt->express_ready) && !should_exit) {
-
-        // oczekiwanie na rampie
-        printf(BLUE "[TRUCK %d] Czekam w kolejce do rampy...\n" RESET, getpid());
-        
-        // czekaj na RAMP (szlaban)
-        if (sem_wait_wrapper(sem_id, SEM_RAMP) == -1) {
-            if (should_exit) break;
-            continue;
-        }
-
-        if (should_exit) {
-            sem_signal(sem_id, SEM_RAMP);
+    // kontynuuj prace dopoki sa paczki na tasmie, nawet po shutdown i SIGTERM
+    while (1) {
+        // zakoncz tylko gdy shutdown + tasma pusta + brak ekspresu (lub SIGTERM + tasma juz pusta)
+        if ((belt->shutdown && belt->current_count == 0 && !belt->express_ready) ||
+            (should_exit && belt->current_count == 0 && !belt->express_ready)) {
             break;
         }
 
-        // sprawdz czy sa jeszcze paczki do zabrania
-        if (belt->shutdown && belt->current_count == 0 && !belt->express_ready) {
+        // oczekiwanie na rampie
+        printf(BLUE "[TRUCK %d] Czekam w kolejce do rampy...\n" RESET, getpid());
+
+        // czekaj na RAMP (szlaban)
+        if (sem_wait_wrapper(sem_id, SEM_RAMP) == -1) {
+            // jesli przerwane przez sygnal, sprawdz czy mozna zakonczyc
+            if (should_exit && belt->current_count == 0 && !belt->express_ready) break;
+            continue;
+        }
+
+        // sprawdz czy mozna zakonczyc po uzyskaniu rampy
+        if ((belt->shutdown && belt->current_count == 0 && !belt->express_ready) ||
+            (should_exit && belt->current_count == 0 && !belt->express_ready)) {
             sem_signal(sem_id, SEM_RAMP);
             break;
         }
@@ -95,12 +97,17 @@ int main() {
         int package_count = 0;
 
         // petla zaladunku
-        // kontynuuj ladowanie nawet po shutdown, dopoki sa paczki
-        while ((!belt->shutdown || belt->current_count > 0 || belt->express_ready) && !should_exit && !force_departure) {
-
+        // kontynuuj ladowanie nawet po shutdown i SIGTERM, dopoki sa paczki lub wymuszony odjazd
+        while (!force_departure) {
+            // zakoncz ladowanie jesli ciezarowka pelna
             if (current_weight >= TRUCK_CAPACITY_KG ||
                 current_volume >= TRUCK_CAPACITY_M3) {
                 printf(BLUE "[TRUCK %d] Pelna!\n" RESET, getpid());
+                break;
+            }
+
+            // zakoncz ladowanie jesli tasma pusta (po shutdown)
+            if (belt->shutdown && belt->current_count == 0 && !belt->express_ready) {
                 break;
             }
 
@@ -108,14 +115,10 @@ int main() {
             printf(BLUE "[TRUCK %d] Czekam na paczki...\n" RESET, getpid());
 
             if (sem_wait_wrapper(sem_id, SEM_FULL) == -1) {
-                if (force_departure || should_exit) break; // jesli przerwane przez sygnal lub shutdown - wyjdz
+                // jesli przerwane przez sygnal, sprawdz czy konczyc
+                if (force_departure) break;
                 if (belt->shutdown && belt->current_count == 0 && !belt->express_ready) break;
                 continue;
-            }
-
-            if (should_exit) {
-                sem_signal(sem_id, SEM_FULL);
-                break;
             }
 
             // sprawdz czy sa jeszcze paczki po shutdown
@@ -126,7 +129,7 @@ int main() {
             // wejscie w sekcje krytyczna
             if (sem_wait_wrapper(sem_id, SEM_MUTEX) == -1) {
                 sem_signal(sem_id, SEM_FULL); // oddajemy paczke bo jej nie wzielismy
-                if (force_departure || should_exit) break;
+                if (force_departure) break;
                 if (belt->shutdown && belt->current_count == 0 && !belt->express_ready) break;
                 continue;
             }
@@ -150,7 +153,9 @@ int main() {
                     if (msg_id != -1) {
                         char log_msg[MSG_MAX_TEXT];
                         snprintf(log_msg, MSG_MAX_TEXT, "Truck %d zaladowal EKSPRES %.1f kg", getpid(), exp.weight);
-                        send_log_message(msg_id, sem_id, log_msg, getpid());
+                        if (send_log_message(msg_id, sem_id, log_msg, getpid()) == -1) {
+                            printf(RED "[TRUCK %d] WARN: Kolejka komunikatow pelna - log odrzucony!\n" RESET, getpid());
+                        }
                     }
 
                     sem_signal(sem_id, SEM_MUTEX); // oddanie mutexu
@@ -198,7 +203,9 @@ int main() {
             if (msg_id != -1) {
                 char log_msg[MSG_MAX_TEXT];
                 snprintf(log_msg, MSG_MAX_TEXT, "Truck %d zaladowal paczke %c %.1f kg", getpid(), pkg.type, pkg.weight);
-                send_log_message(msg_id, sem_id, log_msg, getpid());
+                if (send_log_message(msg_id, sem_id, log_msg, getpid()) == -1) {
+                    printf(RED "[TRUCK %d] WARN: Kolejka komunikatow pelna - log odrzucony!\n" RESET, getpid());
+                }
             }
 
             sem_signal(sem_id, SEM_MUTEX);  // oddaj klucz
@@ -219,7 +226,9 @@ int main() {
             if (msg_id != -1) {
                 char log_msg[MSG_MAX_TEXT];
                 snprintf(log_msg, MSG_MAX_TEXT, "Truck %d odjechal z %d paczkami (%.1f kg)", getpid(), package_count, current_weight);
-                send_log_message(msg_id, sem_id, log_msg, getpid());
+                if (send_log_message(msg_id, sem_id, log_msg, getpid()) == -1) {
+                    printf(RED "[TRUCK %d] WARN: Kolejka komunikatow pelna - log odrzucony!\n" RESET, getpid());
+                }
             }
 
             sem_signal(sem_id, SEM_RAMP); // zwolnij rampe dla nastepej

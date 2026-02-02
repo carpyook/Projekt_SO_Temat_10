@@ -346,19 +346,11 @@ sleep(1);
 printf(CYAN "[MAIN] Czekam na oprozninie tasmy (pozostalo: %d paczek)...\n" RESET,
        belt->current_count);
 
-long iterations = 0;
-long max_iterations = 100000000L; // zabezpieczenie przed nieskonczona petla
-
-while ((belt->current_count > 0 || belt->express_ready) && iterations < max_iterations) {
-    iterations++;
+// czekaj az ciezarowki zaladuja wszystkie paczki
+while (belt->current_count > 0 || belt->express_ready) {
 }
 
-if (belt->current_count == 0 && !belt->express_ready) {
-    printf(CYAN "[MAIN] Tasma oprozniona - wszystkie paczki rozwiezione!\n" RESET);
-} else {
-    printf(CYAN "[MAIN] TIMEOUT: %d paczek zostalo na tasmie.\n" RESET,
-           belt->current_count);
-}
+printf(CYAN "[MAIN] Tasma oprozniona - wszystkie paczki rozwiezione!\n" RESET);
 
 // zabijanie procesow
 printf(CYAN "[MAIN] Wysylam SIGTERM do procesow...\n" RESET);
