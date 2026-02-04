@@ -176,17 +176,19 @@ static inline int check_process_limit(int needed) {
 // bezpieczne wysylanie logu do loggera
 // zapobiega przepelnieniu kolejki -> zwraca -1
 static inline int send_log_message(int msg_id, int sem_id, const char *text, pid_t sender) {
-    // pobranie klucza od straznika 
+    // sprawdzenie czy kolejka pelna (przed zablokowaniem)
+    int guard_val = semctl(sem_id, SEM_MSG_GUARD, GETVAL);
+    if (guard_val == 0) {
+        fprintf(stderr, "[WARN] Kolejka komunikatow pelna - czekam na miejsce...\n");
+    }
+
+    // blokujace czekanie
     struct sembuf guard_down;
     guard_down.sem_num = SEM_MSG_GUARD;
     guard_down.sem_op = -1;
-    guard_down.sem_flg = IPC_NOWAIT; // nie czekaj, jesli  brak miejsca
+    guard_down.sem_flg = 0; // czekaj na miejsce w kolejce, kazdy log musi byc zapisany
 
     if (semop(sem_id, &guard_down, 1) == -1) {
-        if (errno == EAGAIN) {
-            fprintf(stderr, "[WARN] Kolejka komunikatow pelna (semafor straznik)!\n");
-            return -1;
-        }
         perror("semop SEM_MSG_GUARD down");
         return -1;
     }

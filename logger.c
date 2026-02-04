@@ -10,6 +10,8 @@ void handle_sigterm(int sig) { // graceful shutdown
 }
 
 int main() {
+    setbuf(stdout, NULL);
+
     printf(MAGENTA "[LOGGER] Proces logowania uruchomiony (PID: %d)\n" RESET, getpid());
 
     // obsluga SIGTERM, poprawnie zamkniecie pliku przez logger
@@ -74,7 +76,7 @@ int main() {
                 perror("Logger: write");
             }
 
-            // usleep(100000); 0.1s opoznienia po kazdej wiadomosci do testu przepelnienia kolejki
+            //usleep(100000); //0.1s opoznienia po kazdej wiadomosci do testu przepelnienia kolejki
         } else if (ret == 0) {
             // brak wiadomosci w kolejce
             usleep(100000); // oczekiwanie na nowe logi (0.1s)

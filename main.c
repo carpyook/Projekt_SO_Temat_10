@@ -76,6 +76,8 @@ void write_report(const char *format, ...) {
 }
 
 int main() {
+    setbuf(stdout, NULL);
+
     // funkcja sprzatajaca
     atexit(cleanup_ipc);
     // rejestracja sygnalu

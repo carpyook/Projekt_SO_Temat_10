@@ -24,6 +24,8 @@ void handle_sigterm(int sig) {
 }
 
 int main() {
+    setbuf(stdout, NULL);
+
     srand(time(NULL) ^ getpid()); // inicjalizacja losowania
     printf(BLUE "[TRUCK %d] Ciezarowka podjezdza. \n" RESET, getpid());
 
@@ -154,7 +156,7 @@ int main() {
                         char log_msg[MSG_MAX_TEXT];
                         snprintf(log_msg, MSG_MAX_TEXT, "Truck %d zaladowal EKSPRES %.1f kg", getpid(), exp.weight);
                         if (send_log_message(msg_id, sem_id, log_msg, getpid()) == -1) {
-                            printf(RED "[TRUCK %d] WARN: Kolejka komunikatow pelna - log odrzucony!\n" RESET, getpid());
+                            printf(RED "[TRUCK %d] WARN: Kolejka komunikatow pelna \n" RESET, getpid());
                         }
                     }
 
@@ -204,7 +206,7 @@ int main() {
                 char log_msg[MSG_MAX_TEXT];
                 snprintf(log_msg, MSG_MAX_TEXT, "Truck %d zaladowal paczke %c %.1f kg", getpid(), pkg.type, pkg.weight);
                 if (send_log_message(msg_id, sem_id, log_msg, getpid()) == -1) {
-                    printf(RED "[TRUCK %d] WARN: Kolejka komunikatow pelna - log odrzucony!\n" RESET, getpid());
+                    printf(RED "[TRUCK %d] WARN: Kolejka komunikatow pelna \n" RESET, getpid());
                 }
             }
 
@@ -227,7 +229,7 @@ int main() {
                 char log_msg[MSG_MAX_TEXT];
                 snprintf(log_msg, MSG_MAX_TEXT, "Truck %d odjechal z %d paczkami (%.1f kg)", getpid(), package_count, current_weight);
                 if (send_log_message(msg_id, sem_id, log_msg, getpid()) == -1) {
-                    printf(RED "[TRUCK %d] WARN: Kolejka komunikatow pelna - log odrzucony!\n" RESET, getpid());
+                    printf(RED "[TRUCK %d] WARN: Kolejka komunikatow pelna \n" RESET, getpid());
                 }
             }
 

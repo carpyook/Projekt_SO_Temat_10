@@ -11,6 +11,8 @@ void handle_sigterm(int sig) { // prosba o zakonczenie
 }
 
 int main(int argc, char *argv[]) {
+    setbuf(stdout, NULL);
+
     if (argc < 2) { //sprawdzenie czy podano argument startowy
         fprintf(stderr, "Uzycie: %s [TYP A/B/C]\n", argv[0]);
         return 1;
@@ -88,64 +90,72 @@ int main(int argc, char *argv[]) {
 
         printf("%s[P%c] Mam paczke %.1f kg, %.6f m3. Czekam na tasme...\n" RESET, color, type, pkg.weight, pkg.volume);
 
-        
+        // probuj polozyc ta sama paczke az do sukcesu
+        int package_placed = 0;
+        while (!belt->shutdown && !should_exit && !package_placed) {
 
-        // czekaj na wolne miejsce(tasma pelna = stop)
-        if (sem_wait_wrapper(sem_id, SEM_EMPTY) == -1) {
-            if (should_exit || belt->shutdown) break; // przerwane przez zamkniecie systemu
-            continue;
+            // czekaj na wolne miejsce(tasma pelna = stop)
+            if (sem_wait_wrapper(sem_id, SEM_EMPTY) == -1) {
+                continue; // probuj ponownie
+            }
+
+            //sprawdzenie czy nie zamknieto magazynu w miedzyczasie
+            if (belt->shutdown) {
+                sem_signal(sem_id, SEM_EMPTY);
+                break;
+            }
+
+            //czekaj na dostep do pamieci
+            if (sem_wait_wrapper(sem_id, SEM_MUTEX) == -1) {
+                sem_signal(sem_id, SEM_EMPTY);
+                continue; // probuj ponownie
+            }
+
+            // sprawdzenie udzwigu tasmy (limit M)
+            if (belt->current_weight + pkg.weight > MAX_WEIGHT_BELT) {
+                printf("%s[P%c] Tasma przeciazona! Czekam...\n" RESET, color, type);
+
+                // oddanie semaforow, zeby ciezarowka mogla cos zdjac
+                sem_signal(sem_id, SEM_MUTEX);
+                sem_signal(sem_id, SEM_EMPTY);
+
+                sleep(2); // oczekiwanie az ciezarowka zdejmie paczki z tasmy
+                continue; // probuj ponownie ta sama paczke
+            }
+
+            // sukces kladziemy paczke
+            belt->buffer[belt->tail] = pkg;
+
+            // przesuwamy koniec tasmy
+            belt->tail = (belt->tail + 1) % MAX_BUFFER_SIZE;
+
+            // update licznikow
+            belt->current_count++;
+            belt->current_weight += pkg.weight;
+
+            printf("%s[P%c] Polozono paczke (Waga: %.1f). Stan tasmy: %d/%d szt, %.1f kg\n" RESET,
+                color, type, pkg.weight, belt->current_count, MAX_BUFFER_SIZE, belt->current_weight);
+
+            // wyslanie logu
+            if (msg_id != -1) {
+                char log_msg[MSG_MAX_TEXT];
+                snprintf(log_msg, MSG_MAX_TEXT, "Worker %c polozyl paczke %.1f kg", type, pkg.weight);
+                if (send_log_message(msg_id, sem_id, log_msg, getpid()) == -1) {
+                    printf(RED "[P%c] [WARN] Kolejka komunikatow pelna  \n" RESET, type);
+                }
+            }
+
+           sem_signal(sem_id, SEM_MUTEX); // oddaj klucz do pamieci
+           sem_signal(sem_id, SEM_FULL);  // powiadom ciezarowke, ze jest nowa paczka
+
+           package_placed = 1; // oznacz ze paczka zostala polozona
         }
 
-        //sprawdzenie czy nie zamknieto magazynu w miedzyczasie
-        if (belt->shutdown) {
-            sem_signal(sem_id, SEM_EMPTY);
+        // jesli nie udalo sie polozyc paczki, zakoncz calosc
+        if (!package_placed) {
             break;
         }
 
-        //czekaj na dostep do pamieci(tylko jeden proces na raz moze modyfikowac)
-        if (sem_wait_wrapper(sem_id, SEM_MUTEX) == -1) {
-            sem_signal(sem_id, SEM_EMPTY);
-            if (should_exit || belt->shutdown) break;
-            continue;
-        }
-    
-        // sprawdzenie udzwigu tasmy (limit M)
-        if (belt->current_weight + pkg.weight > MAX_WEIGHT_BELT) {
-            printf("%s[P%c] Tasma przeciazona! Czekam...\n" RESET, color, type);          
-            
-            // oddanie semaforow, zeby ciezarowka mogla cos zdjac
-            sem_signal(sem_id, SEM_MUTEX);
-            sem_signal(sem_id, SEM_EMPTY); 
-            
-            sleep(2); // oczekiwanie az ciezarowka zdejmie paczki z tasmy
-            continue; 
-        }  
-        
-        // kladziemy paczke
-        belt->buffer[belt->tail] = pkg;
-
-        // przesuwamy koniec tasmy
-        belt->tail = (belt->tail + 1) % MAX_BUFFER_SIZE;
-
-        // update licznikow
-        belt->current_count++;
-        belt->current_weight += pkg.weight;
-
-        printf("%s[P%c] Polozono paczke (Waga: %.1f). Stan tasmy: %d/%d szt, %.1f kg\n" RESET,
-            color, type, pkg.weight, belt->current_count, MAX_BUFFER_SIZE, belt->current_weight);
-
-        // wyslanie logu
-        if (msg_id != -1) {
-            char log_msg[MSG_MAX_TEXT];
-            snprintf(log_msg, MSG_MAX_TEXT, "Worker %c polozyl paczke %.1f kg", type, pkg.weight);
-            if (send_log_message(msg_id, sem_id, log_msg, getpid()) == -1) {
-                printf(RED "[P%c] WARN: Kolejka komunikatow pelna - log odrzucony!\n" RESET, type);
-            }
-        }
-
-       sem_signal(sem_id, SEM_MUTEX); // oddaj klucz do pamieci
-       sem_signal(sem_id, SEM_FULL);  // powiadom ciezarowke, ze jest nowa paczka
-        
        sleep(rand() % 3 + 1); // symulacja czasu potrzebnego na przygotowanie nastepnej paczki
     }
     

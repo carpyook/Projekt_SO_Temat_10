@@ -17,6 +17,8 @@ void handle_sigterm(int sig) { // graceful shutdown
 }
 
 int main() {
+    setbuf(stdout, NULL); 
+
     srand(time(NULL) ^ getpid()); // inicjalizacja generatora liczb losowych
     printf(YELLOW "[P4] Pracownik Ekspresowy gotowy (PID: %d).\n" RESET, getpid());
     //rejestracja sygnalow
@@ -86,7 +88,7 @@ int main() {
                 char log_msg[MSG_MAX_TEXT];
                 snprintf(log_msg, MSG_MAX_TEXT, "P4 przygotowal ekspres %.1f kg", pkg.weight);
                 if (send_log_message(msg_id, sem_id, log_msg, getpid()) == -1) {
-                    printf(RED "[P4] WARN: Kolejka komunikatow pelna - log odrzucony!\n" RESET);
+                    printf(RED "[P4] WARN: Kolejka komunikatow pelna \n" RESET);
                 }
             }
             // wyjscie z sekcji krytycznej 
